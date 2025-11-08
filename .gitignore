@@ -1,0 +1,14 @@
+# React (Front-end)
+client/node_modules/
+client/build/
+
+# Node (Back-end)
+functions/node_modules/
+functions/lib/
+
+# OS & IDE
+.DS_Store
+
+# Logs
+npm-debug.log*
+*.log
