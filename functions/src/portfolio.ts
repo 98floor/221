@@ -6,7 +6,10 @@ import axios from "axios";
 import {db, FieldValue} from "./index"; // index.ts에서 db, FieldValue 가져오기
 
 // 이 함수들이 사용하는 상수
-const FINNHUB_API_KEY = "KEY"; // Finnhub API 키
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+if (!FINNHUB_API_KEY) {
+  throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+}
 const EXCHANGE_RATE_USD_TO_KRW = 1445;
 
 // [UC-6] 자신의 포트폴리오(자산, 수익률) 확인 (수정본: 환율 적용)

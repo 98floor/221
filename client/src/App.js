@@ -6,6 +6,8 @@ import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import { AppBar, Toolbar, Typography, Button, Container, Box } from '@mui/material';
+import { useAuth } from './hooks/useAuth';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // --- 페이지 임포트 ---
 // (이전과 동일)
@@ -21,10 +23,12 @@ import DebatePage from './pages/DebatePage';
 import QuizPage from './pages/QuizPage';
 import ChatbotPage from './pages/ChatbotPage';
 import AdminPage from './pages/AdminPage';
+import NoticePage from './pages/NoticePage'; // 공지사항 페이지 임포트
 
 
 function App() {
   const navLinks = [
+    { name: '공지사항', path: '/notice' }, // 공지사항 링크 추가
     { name: '거래소', path: '/market' },
     { name: '자산', path: '/portfolio' },
     { name: '랭킹', path: '/ranking' },
@@ -33,22 +37,10 @@ function App() {
     { name: '토론 배틀', path: '/debate' },
     { name: '퀴즈', path: '/quiz' },
     { name: 'AI 챗봇', path: '/chatbot' },
-    { name: '관리자', path: '/admin' },
+    { name: '관리자', path: '/admin', adminOnly: true }, // adminOnly 속성 추가
   ];
 
-  const [currentUser, setCurrentUser] = useState(null);
-
-  // --- Firebase Auth 리스너 ---
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user);
-      } else {
-        setCurrentUser(null);
-      }
-    });
-    return () => unsubscribe();
-  }, []); 
+  const { user, role, loading } = useAuth(); // useAuth 훅 사용
 
   // --- 로그아웃 핸들러 ---
   const handleLogout = async () => {
@@ -96,20 +88,25 @@ function App() {
                 scrollbarWidth: 'none', 
                 '-ms-overflow-style': 'none', 
             }}>
-              {navLinks.map((link) => (
-                <Button
-                  key={link.name}
-                  component={RouterLink}
-                  to={link.path}
-                  sx={{ 
-                    color: 'black', 
-                    marginX: 0.5,
-                    flexShrink: 0, 
-                  }}
-                >
-                  {link.name}
-                </Button>
-              ))}
+              {navLinks.map((link) => {
+                if (link.adminOnly && role !== 'admin') {
+                  return null; // 관리자 전용 링크이고 관리자가 아니면 렌더링하지 않음
+                }
+                return (
+                  <Button
+                    key={link.name}
+                    component={RouterLink}
+                    to={link.path}
+                    sx={{ 
+                      color: 'black', 
+                      marginX: 0.5,
+                      flexShrink: 0, 
+                    }}
+                  >
+                    {link.name}
+                  </Button>
+                );
+              })}
             </Box>
 
             {/* 3. 스페이서 */}
@@ -124,11 +121,11 @@ function App() {
                 minWidth: '150px', 
             }}>
 
-              {currentUser ? (
+              {user ? (
                 // --- 1. [로그인 됨] 상태 ---
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ marginRight: 2, whiteSpace: 'nowrap' }}>
-                    {currentUser.email}
+                    {user.email}
                   </Typography>
                   <Button 
                     onClick={() => handleLogout(false)} 
@@ -170,11 +167,12 @@ function App() {
       {/* --- 페이지 컨텐츠 영역 --- */}
       <Container maxWidth="lg" sx={{ marginTop: 3 }}>
         <Routes>
-          {/* HomePage에 currentUser prop을 전달. */}
-          <Route path="/" element={<HomePage currentUser={currentUser} />} /> 
+          {/* HomePage에 user prop을 전달. */}
+          <Route path="/" element={<HomePage user={user} />} /> 
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/notice" element={<NoticePage />} />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/ranking" element={<RankingPage />} />
@@ -183,7 +181,14 @@ function App() {
           <Route path="/debate" element={<DebatePage />} />
           <Route path="/quiz" element={<QuizPage />} />
           <Route path="/chatbot" element={<ChatbotPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminPage />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </Container>
 

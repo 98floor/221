@@ -1,3 +1,4 @@
+import "dotenv/config";
 // functions/src/index.ts
 // (이 파일은 Firebase를 초기화하고, 다른 모든 함수 파일들을 불러오는 '허브' 역할을 합니다.)
 
@@ -26,3 +27,7 @@ export * from "./portfolio";
 export * from "./user";
 export * from "./community";
 export * from "./admin";
+export * from "./notice";
+export * from "./quiz";
+export * from "./debate";
+export * from "./orders";

@@ -8,8 +8,13 @@ import axios from "axios"; // market 함수들이 사용하는 import
 import {db, FieldValue} from "./index";
 
 // 이 함수들이 사용하는 상수
-const ALPHA_VANTAGE_API_KEY = "KEY"; // Alpha Vantage API 키
-const FINNHUB_API_KEY = "KEY"; // Finnhub API 키
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+
+if (!ALPHA_VANTAGE_API_KEY || !FINNHUB_API_KEY) {
+  throw new Error("ALPHA_VANTAGE_API_KEY 또는 FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+}
+
 const EXCHANGE_RATE_USD_TO_KRW = 1445; // 고정 환율
 
 // [UC-3] 주식/코인 시세 조회 (수정본: Alpha Vantage 캔들 차트 + 검색 기능)

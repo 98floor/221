@@ -1,6 +1,8 @@
 // functions/src/user.ts
 import * as functions from "firebase-functions/v1";
 import {db, FieldValue} from "./index"; // index.ts에서 db, FieldValue 가져오기
+import * as fs from "fs"; // fs 모듈 임포트
+import * as path from "path"; // path 모듈 임포트
 
 // [UC-1] 회원가입 (프로필 생성)
 // (이 로직은 RegisterPage.js가 직접 setDoc을 호출하는 방식)
@@ -37,11 +39,12 @@ export const activateAccount = functions
         return {success: true, message: "이미 활성화된 계정입니다."};
       }
 
-      // 3. 'pending_verification' 상태를 'active'로 변경하고 초기 자본 지급
+      // 3. 'pending_verification' 상태를 'active'로 변경하고 초기 자본 지급 + 역할 부여
       await userRef.update({
         status: "active",
         virtual_asset: 10000000, // 초기 자본 1,000만원
         quiz_try_cnt: 0,
+        role: "user", // 기본 역할 'user'로 설정
       });
 
       return {success: true, message: "계정이 활성화되었습니다. 1,000만원이 지급되었습니다."};
@@ -51,6 +54,44 @@ export const activateAccount = functions
         throw error;
       }
       throw new functions.https.HttpsError("internal", "계정 활성화에 실패했습니다.");
+    }
+  });
+
+// [신규] 닉네임 중복 확인 함수
+export const checkNickname = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    const {nickname} = data;
+    if (!nickname) {
+      throw new functions.https.HttpsError("invalid-argument", "닉네임을 입력해야 합니다.");
+    }
+
+    try {
+      const usersRef = db.collection("users");
+      const snapshot = await usersRef.where("nickname", "==", nickname).limit(1).get();
+
+      if (snapshot.empty) {
+        return {isAvailable: true, message: "사용 가능한 닉네임입니다."};
+      } else {
+        return {isAvailable: false, message: "이미 사용 중인 닉네임입니다."};
+      }
+    } catch (error) {
+      console.error("닉네임 중복 확인 오류:", error);
+      throw new functions.https.HttpsError("internal", "닉네임 확인 중 오류가 발생했습니다.");
+    }
+  });
+
+// [신규] 대학교 목록 가져오기 함수
+export const getUniversities = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    try {
+      const filePath = path.join(__dirname, "data", "universities.json");
+      const universities = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      return {success: true, universities};
+    } catch (error) {
+      console.error("대학교 목록 로딩 오류:", error);
+      throw new functions.https.HttpsError("internal", "대학교 목록을 불러오는 데 실패했습니다.");
     }
   });
 
@@ -78,7 +119,7 @@ export const checkQuizEligibility = functions
       const userCash = userData["virtual_asset"];
       const tryCount = userData["quiz_try_cnt"];
       console.log("테스트용 임시 로그:", {userCash, initialCapital});
-      const isEligibleAsset = true;
+      const isEligibleAsset = userCash <= initialCapital * 0.1;
       const isEligibleCount = tryCount < 2;
       if (isEligibleAsset && isEligibleCount) {
         return {eligible: true};

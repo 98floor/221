@@ -6,9 +6,12 @@ import {db, FieldValue} from "./index"; // index.ts에서 db, FieldValue 가져�
 import {GoogleGenerativeAI} from "@google/generative-ai"; // 챗봇용 라이브러리
 
 // --- Gemini API 설정 ---
-const GEMINI_API_KEY = "KEY"; // 🚨 Gemini API 키
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY가 .env 파일에 설정되지 않았습니다.");
+}
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
+const model = genAI.getGenerativeModel({model: "gemini-2.0-flash-lite"});
 
 // [UC-9] 게시판 글 작성
 export const createPost = functions
@@ -45,6 +48,33 @@ export const createPost = functions
     }
   });
 
+// [신규] 관리자 게시물 삭제 함수
+export const deletePost = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // 1. 관리자 확인
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "관리자 권한이 없습니다.");
+    }
+
+    // 2. 데이터 유효성 검사
+    const {postId} = data;
+    if (!postId) {
+      throw new functions.https.HttpsError("invalid-argument", "게시물 ID가 필요합니다.");
+    }
+
+    // 3. Firestore에서 게시물 삭제
+    try {
+      await db.collection("posts").doc(postId).delete();
+      return {success: true, message: "게시물이 삭제되었습니다."};
+    } catch (error) {
+      console.error("게시물 삭제 오류:", error);
+      throw new functions.https.HttpsError("internal", "게시물 삭제 중 오류가 발생했습니다.");
+    }
+  });
+
 // [UC-10] AI 챗봇에게 투자 관련 질문
 export const askChatbot = functions
   .region("asia-northeast3")
@@ -68,6 +98,7 @@ export const askChatbot = functions
         1. 항상 대학생에게 말하듯, 친절하고 이해하기 쉬운 말투를 사용하세요.
         2. 절대로 실제 금융 상품을 '추천'하거나 '매수/매도'를 권유하지 마세요.
         3. 답변은 항상 "모의 투자 학습"을 위한 참고용 정보임을 명시하세요.
+        4. 항상 한 문장으로 간단히 말해.
 
         사용자 질문: ${userPrompt}
       `;

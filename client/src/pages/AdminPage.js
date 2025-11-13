@@ -1,75 +1,264 @@
 // client/src/pages/AdminPage.js
-import React, { useState } from 'react';
-import { functions } from '../firebase'; // functions 임포트
-import { httpsCallable } from 'firebase/functions'; // httpsCallable 임포트
+import React, { useState, useEffect, useCallback } from 'react';
+import { db, functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { useAuth } from '../hooks/useAuth';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 function AdminPage() {
-  const [loadingSeason, setLoadingSeason] = useState(false);
+  const { user, role, loading: authLoading } = useAuth();
+
+  // --- State Management ---
   const [message, setMessage] = useState('');
+  
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userManagementMessage, setUserManagementMessage] = useState('');
 
-  // [UC-15] 시즌 마감 함수 호출
-  const handleEndSeason = async () => {
-    //  (중요) 실제 서비스에서는 이 함수를 호출하기 전에 사용자가 '관리자(admin)' 권한이 있는지 먼저 확인
-    //  (지금은 테스트를 위해 누구나 호출 가능하게 둡니다)
+  const [posts, setPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postMessage, setPostMessage] = useState('');
 
-    // 1. 관리자에게 위험한 작업임을 재확인
-    if (!window.confirm(
-        '정말로 이번 시즌을 마감하시겠습니까?\n' + 
-        '모든 사용자의 자산이 초기화되며, 되돌릴 수 없습니다.'
-    )) {
-      return; // '취소'를 누르면 함수 종료
-    }
+  const [quizzes, setQuizzes] = useState([]);
+  const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+  const [quizMessage, setQuizMessage] = useState('');
+  const [newQuiz, setNewQuiz] = useState({ question: '', options: ['', '', '', ''], answerIndex: 0 });
 
-    setLoadingSeason(true);
-    setMessage('');
+  const [debates, setDebates] = useState([]);
+  const [loadingDebates, setLoadingDebates] = useState(false);
+  const [debateMessage, setDebateMessage] = useState('');
+  const [newDebateTopic, setNewDebateTopic] = useState('');
+
+  const [adminEmail, setAdminEmail] = useState('');
+  const [loadingSetAdmin, setLoadingSetAdmin] = useState(false);
+  const [setAdminMessage, setSetAdminMessage] = useState('');
+
+  const [loadingSeason, setLoadingSeason] = useState(false);
+
+  // --- Data Fetching ---
+  const fetchAllAdminData = useCallback(async () => {
+    if (role !== 'admin') return;
+    
+    setLoadingUsers(true);
+    setLoadingPosts(true);
+    setLoadingQuizzes(true);
+    setLoadingDebates(true);
 
     try {
-      // 2. 'endSeason' Cloud Function 호출
-      const endSeason = httpsCallable(functions, 'endSeason');
-      const result = await endSeason();
+      const usersResultPromise = httpsCallable(functions, 'listAllUsers')();
+      const postsSnapshotPromise = getDocs(query(collection(db, 'posts'), orderBy('created_at', 'desc')));
+      const quizzesSnapshotPromise = getDocs(query(collection(db, 'quizzes'), orderBy('createdAt', 'desc')));
+      const debatesSnapshotPromise = getDocs(query(collection(db, 'debates'), orderBy('createdAt', 'desc')));
+      
+      const [usersResult, postsSnapshot, quizzesSnapshot, debatesSnapshot] = await Promise.all([
+        usersResultPromise, postsSnapshotPromise, quizzesSnapshotPromise, debatesSnapshotPromise
+      ]);
 
-      // 3. 성공 메시지 표시
-      setMessage(result.data.message);
+      if (usersResult.data.success) setUsers(usersResult.data.users);
+      setPosts(postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setQuizzes(quizzesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setDebates(debatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
     } catch (err) {
-      console.error("시즌 마감(UC-15) 실패:", err);
+      setMessage(`데이터 로딩 중 오류 발생: ${err.message}`);
+    } finally {
+      setLoadingUsers(false);
+      setLoadingPosts(false);
+      setLoadingQuizzes(false);
+      setLoadingDebates(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    fetchAllAdminData();
+  }, [fetchAllAdminData]);
+
+  // --- Handlers ---
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('정말로 이 게시물을 삭제하시겠습니까?')) return;
+    setPostMessage('게시물 삭제 중...');
+    try {
+      await httpsCallable(functions, 'deletePost')({ postId });
+      setPostMessage('게시물이 삭제되었습니다.');
+      fetchAllAdminData();
+    } catch (err) {
+      setPostMessage(`삭제 실패: ${err.message}`);
+    }
+  };
+
+  const handleToggleSuspension = async (uid, suspend) => {
+    const action = suspend ? '정지' : '활성화';
+    if (!window.confirm(`정말로 이 사용자를 ${action}시키겠습니까?`)) return;
+    setUserManagementMessage('처리 중...');
+    try {
+      await httpsCallable(functions, 'toggleUserSuspension')({ uid, suspend });
+      setUserManagementMessage(`사용자가 ${action}되었습니다.`);
+      fetchAllAdminData();
+    } catch (err) {
+      setUserManagementMessage(`작업 실패: ${err.message}`);
+    }
+  };
+
+  const handleCreateQuiz = async (e) => {
+    e.preventDefault();
+    setQuizMessage('퀴즈 생성 중...');
+    try {
+      await httpsCallable(functions, 'createQuiz')(newQuiz);
+      setQuizMessage('퀴즈가 생성되었습니다.');
+      setNewQuiz({ question: '', options: ['', '', '', ''], answerIndex: 0 });
+      fetchAllAdminData();
+    } catch (err) {
+      setQuizMessage(`생성 실패: ${err.message}`);
+    }
+  };
+
+  const handleDeleteQuiz = async (quizId) => {
+    if (!window.confirm('정말로 이 퀴즈를 삭제하시겠습니까?')) return;
+    setQuizMessage('퀴즈 삭제 중...');
+    try {
+      await httpsCallable(functions, 'deleteQuiz')({ quizId });
+      setQuizMessage('퀴즈가 삭제되었습니다.');
+      fetchAllAdminData();
+    } catch (err) {
+      setQuizMessage(`삭제 실패: ${err.message}`);
+    }
+  };
+
+  const handleCreateDebate = async (e) => {
+    e.preventDefault();
+    setDebateMessage('토론 주제 생성 중...');
+    try {
+      await httpsCallable(functions, 'createDebate')({ topic: newDebateTopic });
+      setDebateMessage('토론 주제가 생성되었습니다.');
+      setNewDebateTopic('');
+      fetchAllAdminData();
+    } catch (err) {
+      setDebateMessage(`생성 실패: ${err.message}`);
+    }
+  };
+
+  const handleDeleteDebate = async (debateId) => {
+    if (!window.confirm('정말로 이 토론을 삭제하시겠습니까?')) return;
+    setDebateMessage('토론 주제 삭제 중...');
+    try {
+      await httpsCallable(functions, 'deleteDebate')({ debateId });
+      setDebateMessage('토론 주제가 삭제되었습니다.');
+      fetchAllAdminData();
+    } catch (err) {
+      setDebateMessage(`삭제 실패: ${err.message}`);
+    }
+  };
+  
+  const handleSetAdmin = async () => {
+    if (!adminEmail) return setSetAdminMessage('이메일을 입력해주세요.');
+    setLoadingSetAdmin(true);
+    try {
+      const result = await httpsCallable(functions, 'setAdminRole')({ email: adminEmail });
+      setSetAdminMessage(result.data.message);
+      setAdminEmail('');
+    } catch (err) {
+      setSetAdminMessage(`지정 실패: ${err.message}`);
+    } finally {
+      setLoadingSetAdmin(false);
+    }
+  };
+
+  const handleEndSeason = async () => {
+    if (!window.confirm('정말로 이번 시즌을 마감하시겠습니까?\n모든 사용자의 자산이 초기화되며, 되돌릴 수 없습니다.')) return;
+    setLoadingSeason(true);
+    try {
+      const result = await httpsCallable(functions, 'endSeason')();
+      setMessage(result.data.message);
+    } catch (err) {
       setMessage(`시즌 마감 실패: ${err.message}`);
     } finally {
       setLoadingSeason(false);
     }
   };
 
+  if (authLoading) return <div>관리자 정보 확인 중...</div>;
+
   return (
     <div>
-      <h2>관리자 페이지 (UC-13 ~ UC-18)</h2>
+      <h2>관리자 페이지</h2>
+      <p>현재 로그인된 사용자: {user ? user.email : '없음'} | 역할: {role || '없음'}</p>
+      <button onClick={fetchAllAdminData}>전체 데이터 새로고침</button>
+      {message && <p style={{color: 'blue', fontWeight: 'bold'}}>{message}</p>}
 
-      <div style={{ border: '2px solid red', padding: '10px' }}>
-        <h3>시즌 관리 (UC-15)</h3>
-        <p style={{ color: 'red' }}>
-          [주의!] 이 버튼을 누르면 즉시 현재 시즌이 마감되고, 
-          모든 사용자의 자산이 1,000만원으로 초기화됩니다.
-        </p>
-
-        <button 
-          onClick={handleEndSeason} 
-          disabled={loadingSeason}
-          style={{ backgroundColor: 'red', color: 'white', padding: '10px 20px' }}
-        >
-          {loadingSeason ? '마감 처리 중...' : '시즌 마감 실행 (UC-15)'}
-        </button>
-
-        {message && (
-          <p style={{ 
-            marginTop: '15px', 
-            color: message.includes('실패') ? 'red' : 'blue',
-            fontWeight: 'bold'
-          }}>
-            {message}
-          </p>
+      <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
+        <h3>게시물 관리</h3>
+        {postMessage && <p>{postMessage}</p>}
+        {loadingPosts ? <p>게시물 로딩 중...</p> : (
+          <ul>{posts.map(p => (<li key={p.id}>"{p.title}" <button onClick={() => handleDeletePost(p.id)}>삭제</button></li>))}</ul>
         )}
       </div>
 
-      {/* TODO: 여기에 UC-13(사용자 관리), UC-14(게시물 관리) 등 다른 관리자 기능 UI 추가 */}
+      <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
+        <h3>사용자 계정 관리</h3>
+        {userManagementMessage && <p>{userManagementMessage}</p>}
+        {loadingUsers ? <p>사용자 로딩 중...</p> : (
+          <table>
+            <thead><tr><th>Email</th><th>UID</th><th>상태</th><th>작업</th></tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.uid}>
+                  <td>{u.email}</td>
+                  <td>{u.uid}</td>
+                  <td style={{ color: u.disabled ? 'red' : 'green' }}>{u.disabled ? '정지됨' : '활성'}</td>
+                  <td>
+                    {u.disabled ? <button onClick={() => handleToggleSuspension(u.uid, false)}>활성화</button> : <button onClick={() => handleToggleSuspension(u.uid, true)}>정지</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
+        <h3>퀴즈 관리</h3>
+        {quizMessage && <p>{quizMessage}</p>}
+        <form onSubmit={handleCreateQuiz}>
+          <input type="text" value={newQuiz.question} onChange={(e) => setNewQuiz({...newQuiz, question: e.target.value})} placeholder="퀴즈 질문" required />
+          {newQuiz.options.map((opt, i) => (
+            <input key={i} type="text" value={opt} onChange={(e) => { const opts = [...newQuiz.options]; opts[i] = e.target.value; setNewQuiz({...newQuiz, options: opts}); }} placeholder={`보기 ${i+1}`} required />
+          ))}
+          <select value={newQuiz.answerIndex} onChange={(e) => setNewQuiz({...newQuiz, answerIndex: Number(e.target.value)})}>
+            {newQuiz.options.map((opt, i) => (<option key={i} value={i}>{`정답: 보기 ${i+1}`}</option>))}
+          </select>
+          <button type="submit">퀴즈 생성</button>
+        </form>
+        {loadingQuizzes ? <p>퀴즈 로딩 중...</p> : (
+          <ul>{quizzes.map(q => (<li key={q.id}>"{q.question}" <button onClick={() => handleDeleteQuiz(q.id)}>삭제</button></li>))}</ul>
+        )}
+      </div>
+
+      <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
+        <h3>토론 관리</h3>
+        {debateMessage && <p>{debateMessage}</p>}
+        <form onSubmit={handleCreateDebate}>
+          <input type="text" value={newDebateTopic} onChange={(e) => setNewDebateTopic(e.target.value)} placeholder="새 토론 주제" required />
+          <button type="submit">토론 생성</button>
+        </form>
+        {loadingDebates ? <p>토론 로딩 중...</p> : (
+          <ul>{debates.map(d => (<li key={d.id}>"{d.topic}" <button onClick={() => handleDeleteDebate(d.id)}>삭제</button></li>))}</ul>
+        )}
+      </div>
+
+      <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
+        <h3>관리자 권한 부여</h3>
+        <input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="사용자 이메일" />
+        <button onClick={handleSetAdmin} disabled={loadingSetAdmin}>{loadingSetAdmin ? '지정 중...' : '관리자 지정'}</button>
+        {setAdminMessage && <p>{setAdminMessage}</p>}
+      </div>
+
+      <div style={{ border: '2px solid red', padding: '16px', margin: '20px 0' }}>
+        <h3>시즌 관리</h3>
+        <p>[주의!] 이 버튼을 누르면 시즌이 마감되고 모든 사용자 자산이 초기화됩니다.</p>
+        <button onClick={handleEndSeason} disabled={loadingSeason} style={{ backgroundColor: 'red', color: 'white' }}>
+          {loadingSeason ? '마감 처리 중...' : '시즌 마감 실행'}
+        </button>
+      </div>
     </div>
   );
 }

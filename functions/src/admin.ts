@@ -4,10 +4,132 @@
 import * as functions from "firebase-functions/v1";
 import axios from "axios";
 import {db} from "./index"; // index.ts에서 db, FieldValue 가져오기
+import {getAuth} from "firebase-admin/auth";
 
 // 이 함수들이 사용하는 상수
-const FINNHUB_API_KEY = "KEY"; //Finnhub API 키
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+if (!FINNHUB_API_KEY) {
+  throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+}
 const EXCHANGE_RATE_USD_TO_KRW = 1445;
+
+// [신규] 관리자 지정 함수
+export const setAdminRole = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // 1. 호출자가 인증되었는지 확인
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "이 기능을 실행하려면 로그인이 필요합니다."
+      );
+    }
+    const callerUid = context.auth.uid;
+
+    // 2. 호출자의 Firestore 문서를 읽어 관리자인지 확인
+    const callerRef = db.collection("users").doc(callerUid);
+    const callerDoc = await callerRef.get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "이 기능을 실행할 관리자 권한이 없습니다."
+      );
+    }
+
+    const {email} = data;
+    if (!email) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "관리자로 지정할 사용자의 이메일을 입력해야 합니다."
+      );
+    }
+
+    try {
+      // 3. 이메일로 사용자 조회
+      const userRecord = await getAuth().getUserByEmail(email);
+      const uid = userRecord.uid;
+
+      // 4. Firestore 'users' 컬렉션에 역할 업데이트
+      const userRef = db.collection("users").doc(uid);
+      await userRef.update({role: "admin"});
+
+      return {success: true, message: `${email} 사용자가 관리자로 지정되었습니다.`};
+    } catch (error) {
+      console.error("관리자 지정 오류:", error);
+      // 'error'가 'code' 속성을 가진 객체인지 확인 (타입 가드)
+      if (typeof error === "object" && error !== null && "code" in error && (error as {code: unknown}).code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "해당 이메일을 가진 사용자를 찾을 수 없습니다.");
+      }
+      throw new functions.https.HttpsError("internal", "관리자 지정에 실패했습니다.");
+    }
+  });
+
+// [신규] 모든 사용자 목록 가져오기
+export const listAllUsers = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // 1. 호출자가 관리자인지 확인
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerRef = db.collection("users").doc(context.auth.uid);
+    const callerDoc = await callerRef.get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "관리자 권한이 없습니다.");
+    }
+
+    try {
+      const listUsersResult = await getAuth().listUsers(1000); // 최대 1000명
+      const users = listUsersResult.users.map((userRecord) => {
+        return {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          disabled: userRecord.disabled,
+          creationTime: userRecord.metadata.creationTime,
+        };
+      });
+      return {success: true, users};
+    } catch (error) {
+      console.error("모든 사용자 목록 가져오기 오류:", error);
+      throw new functions.https.HttpsError("internal", "사용자 목록을 가져오는 데 실패했습니다.");
+    }
+  });
+
+// [신규] 사용자 계정 정지/활성화 토글
+export const toggleUserSuspension = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // 1. 호출자가 관리자인지 확인
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerRef = db.collection("users").doc(context.auth.uid);
+    const callerDoc = await callerRef.get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "관리자 권한이 없습니다.");
+    }
+
+    const {uid, suspend} = data;
+    if (!uid) {
+      throw new functions.https.HttpsError("invalid-argument", "사용자 UID가 필요합니다.");
+    }
+
+    try {
+      // 2. Firebase Auth에서 사용자 비활성화/활성화
+      await getAuth().updateUser(uid, {disabled: suspend});
+
+      // 3. Firestore 문서 상태 업데이트
+      const userRef = db.collection("users").doc(uid);
+      await userRef.update({status: suspend ? "suspended" : "active"});
+
+      const action = suspend ? "정지" : "활성화";
+      return {success: true, message: `사용자 계정이 ${action}되었습니다.`};
+    } catch (error) {
+      console.error("사용자 계정 정지/활성화 오류:", error);
+      throw new functions.https.HttpsError("internal", "작업에 실패했습니다.");
+    }
+  });
+
 
 // [UC-15] 시즌 마감 (관리자 기능) (최종 수정본: 환율 적용 + 보유 종목 초기화 + 랭킹 초기화 + Null 검사)
 export const endSeason = functions
