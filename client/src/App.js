@@ -24,6 +24,7 @@ import QuizPage from './pages/QuizPage';
 import ChatbotPage from './pages/ChatbotPage';
 import AdminPage from './pages/AdminPage';
 import NoticePage from './pages/NoticePage'; // 공지사항 페이지 임포트
+import PasswordResetPage from './pages/PasswordResetPage';
 
 
 function App() {
@@ -171,6 +172,7 @@ function App() {
           <Route path="/" element={<HomePage user={user} />} /> 
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/password-reset" element={<PasswordResetPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/notice" element={<NoticePage />} />
           <Route path="/market" element={<MarketPage />} />
