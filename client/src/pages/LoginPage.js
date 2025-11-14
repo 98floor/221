@@ -77,6 +77,9 @@ function LoginPage() {
       />
       <br />
       <button onClick={handleLogin}>로그인</button>
+      <Link to="/password-reset">
+        <button>비밀번호 찾기</button>
+      </Link>
       <Link to="/register">
         <button>회원가입</button>
       </Link>

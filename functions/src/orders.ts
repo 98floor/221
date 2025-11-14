@@ -5,71 +5,76 @@ import axios from "axios";
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-interface LimitOrder {
-  id: string;
-  userId: string;
-  asset_code: string;
-  type: "buy" | "sell";
-  limit_price: number;
-  quantity: number;
-  status: "open" | "filled" | "cancelled";
-}
-
-// ... (placeLimitOrder and cancelLimitOrder functions)
-
-// [신규] 지정가 주문 처리 엔진 (1분마다 실행)
-export const processLimitOrders = functions
+// [UC-4] 시장가 매수/매도
+export const placeMarketOrder = functions
   .region("asia-northeast3")
-  .pubsub.schedule("every 1 minutes").onRun(async (context) => {
-    console.log("지정가 주문 처리 엔진을 시작합니다.");
-
-    const openOrdersQuery = db.collection("limit_orders").where("status", "==", "open");
-    const snapshot = await openOrdersQuery.get();
-
-    if (snapshot.empty) {
-      console.log("처리할 지정가 주문이 없습니다.");
-      return null;
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 주문할 수 있습니다.");
     }
 
-    const processingPromises = snapshot.docs.map(async (doc) => {
-      const order = {id: doc.id, ...doc.data()} as LimitOrder;
+    const {asset_code, quantity, type} = data;
+    const uid = context.auth.uid;
 
-      try {
-        // 1. 현재가 조회
-        const response = await axios.get(`https://finnhub.io/api/v1/quote?symbol=${order.asset_code}&token=${FINNHUB_API_KEY}`);
-        const currentPrice = response.data.c;
+    if (!asset_code || !quantity || quantity <= 0 || !["buy", "sell"].includes(type)) {
+      throw new functions.https.HttpsError("invalid-argument", "주문 정보가 올바르지 않습니다.");
+    }
 
-        if (!currentPrice || currentPrice <= 0) return;
+    const userRef = db.collection("users").doc(uid);
+    const holdingRef = userRef.collection("holdings").doc(asset_code);
 
-        const shouldExecute = (order.type === "buy" && currentPrice <= order.limit_price) ||
-                              (order.type === "sell" && currentPrice >= order.limit_price);
+    try {
+      // 1. 현재가 조회
+      const response = await axios.get(`https://finnhub.io/api/v1/quote?symbol=${asset_code}&token=${FINNHUB_API_KEY}`);
+      const currentPrice = response.data.c;
 
-        if (shouldExecute) {
-          // 2. 조건 만족 시 거래 실행
-          const orderRef = db.collection("limit_orders").doc(order.id);
-          const userRef = db.collection("users").doc(order.userId);
-          const holdingRef = userRef.collection("holdings").doc(order.asset_code);
-
-          await db.runTransaction(async (transaction) => {
-            const holdingDoc = await transaction.get(holdingRef);
-
-            if (order.type === "buy") {
-              const newQuantity = (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + order.quantity;
-              transaction.set(holdingRef, {asset_code: order.asset_code, quantity: newQuantity}, {merge: true});
-            } else { // sell
-              const saleValue = currentPrice * order.quantity;
-              transaction.update(userRef, {virtual_asset: FieldValue.increment(saleValue)});
-            }
-            transaction.update(orderRef, {status: "filled", filled_price: currentPrice});
-          });
-          console.log(`주문 체결: ${order.id}`);
-        }
-      } catch (error) {
-        console.error(`주문 처리 실패 (ID: ${order.id}):`, error);
+      if (!currentPrice || currentPrice <= 0) {
+        throw new functions.https.HttpsError("not-found", "현재가를 조회할 수 없습니다.");
       }
-    });
 
-    await Promise.all(processingPromises);
-    console.log("지정가 주문 처리 엔진을 종료합니다.");
-    return null;
+      // 2. 트랜잭션으로 매수/매도 처리
+      await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        const holdingDoc = await transaction.get(holdingRef);
+
+        if (!userDoc.exists) {
+          throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+        }
+
+        const userData = userDoc.data();
+        if (!userData) {
+          throw new functions.https.HttpsError("internal", "사용자 데이터를 읽을 수 없습니다.");
+        }
+
+        if (type === "buy") {
+          const cost = currentPrice * quantity;
+          if (userData.virtual_asset < cost) {
+            throw new functions.https.HttpsError("failed-precondition", "가상 자산이 부족합니다.");
+          }
+          transaction.update(userRef, {virtual_asset: FieldValue.increment(-cost)});
+          const newQuantity = (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + quantity;
+          transaction.set(holdingRef, {asset_code, quantity: newQuantity}, {merge: true});
+        } else { // sell
+          if (!holdingDoc.exists || holdingDoc.data()?.quantity < quantity) {
+            throw new functions.https.HttpsError("failed-precondition", "보유 수량이 부족합니다.");
+          }
+          const saleValue = currentPrice * quantity;
+          transaction.update(userRef, {virtual_asset: FieldValue.increment(saleValue)});
+          const newQuantity = holdingDoc.data()?.quantity - quantity;
+          if (newQuantity > 0) {
+            transaction.update(holdingRef, {quantity: newQuantity});
+          } else {
+            transaction.delete(holdingRef);
+          }
+        }
+      });
+
+      return {success: true, message: `시장가 ${type === "buy" ? "매수" : "매도"} 주문이 체결되었습니다.`};
+    } catch (error) {
+      console.error("시장가 주문(UC-4) 오류:", error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError("internal", "시장가 주문 처리에 실패했습니다.");
+    }
   });
