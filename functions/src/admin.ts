@@ -8,9 +8,11 @@ import {getAuth} from "firebase-admin/auth";
 
 // 이 함수들이 사용하는 상수
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
-if (!FINNHUB_API_KEY) {
-  throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
-}
+
+// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
+// if (!FINNHUB_API_KEY) {
+//   throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+// }
 const EXCHANGE_RATE_USD_TO_KRW = 1445;
 
 // [신규] 관리자 지정 함수
@@ -135,6 +137,11 @@ export const toggleUserSuspension = functions
 export const endSeason = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!FINNHUB_API_KEY) {
+      throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
+    }
+
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "관리자 권한이 필요합니다.");
     }

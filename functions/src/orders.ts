@@ -13,19 +13,23 @@ export const placeMarketOrder = functions
       throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 주문할 수 있습니다.");
     }
 
-    const {asset_code, quantity, type} = data;
+    // [수정됨] asset_code -> assetCode 로 변수명 변경 (camelcase 룰)
+    const {asset_code: assetCode, quantity, type} = data;
     const uid = context.auth.uid;
 
-    if (!asset_code || !quantity || quantity <= 0 || !["buy", "sell"].includes(type)) {
+    // [수정됨] assetCode 변수 사용
+    if (!assetCode || !quantity || quantity <= 0 || !["buy", "sell"].includes(type)) {
       throw new functions.https.HttpsError("invalid-argument", "주문 정보가 올바르지 않습니다.");
     }
 
     const userRef = db.collection("users").doc(uid);
-    const holdingRef = userRef.collection("holdings").doc(asset_code);
+    // [수정됨] assetCode 변수 사용
+    const holdingRef = userRef.collection("holdings").doc(assetCode);
 
     try {
       // 1. 현재가 조회
-      const response = await axios.get(`https://finnhub.io/api/v1/quote?symbol=${asset_code}&token=${FINNHUB_API_KEY}`);
+      // [수정됨] assetCode 변수 사용
+      const response = await axios.get(`https://finnhub.io/api/v1/quote?symbol=${assetCode}&token=${FINNHUB_API_KEY}`);
       const currentPrice = response.data.c;
 
       if (!currentPrice || currentPrice <= 0) {
@@ -53,7 +57,8 @@ export const placeMarketOrder = functions
           }
           transaction.update(userRef, {virtual_asset: FieldValue.increment(-cost)});
           const newQuantity = (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + quantity;
-          transaction.set(holdingRef, {asset_code, quantity: newQuantity}, {merge: true});
+          // [수정됨] DB 필드명은 asset_code, 변수명은 assetCode
+          transaction.set(holdingRef, {asset_code: assetCode, quantity: newQuantity}, {merge: true});
         } else { // sell
           if (!holdingDoc.exists || holdingDoc.data()?.quantity < quantity) {
             throw new functions.https.HttpsError("failed-precondition", "보유 수량이 부족합니다.");

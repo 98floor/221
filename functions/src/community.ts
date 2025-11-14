@@ -7,11 +7,15 @@ import {GoogleGenerativeAI} from "@google/generative-ai"; // 챗봇용 라이브
 
 // --- Gemini API 설정 ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY가 .env 파일에 설정되지 않았습니다.");
-}
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({model: "gemini-2.0-flash-lite"});
+
+// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
+// if (!GEMINI_API_KEY) {
+//   throw new Error("GEMINI_API_KEY가 .env 파일에 설정되지 않았습니다.");
+// }
+
+// 🔽 [수정됨] genAI와 model을 즉시 초기화하지 않고, 필요할 때 초기화하도록 변경
+// const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// const model = genAI.getGenerativeModel({model: "gemini-2.0-flash-lite"});
 
 // [UC-9] 게시판 글 작성
 export const createPost = functions
@@ -79,6 +83,15 @@ export const deletePost = functions
 export const askChatbot = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 및 Gemini 클라이언트 초기화를 함수 내부로 이동
+    if (!GEMINI_API_KEY) {
+      throw new functions.https.HttpsError("internal", "GEMINI_API_KEY가 설정되지 않았습니다.");
+    }
+
+    // 🔽 [수정됨] API 키가 있을 때만 genAI와 model을 초기화
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({model: "gemini-2.0-flash-lite"});
+
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 챗봇을 이용할 수 있습니다.");
     }

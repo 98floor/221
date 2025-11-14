@@ -11,9 +11,10 @@ import {db, FieldValue} from "./index";
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-if (!ALPHA_VANTAGE_API_KEY || !FINNHUB_API_KEY) {
-  throw new Error("ALPHA_VANTAGE_API_KEY 또는 FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
-}
+// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
+// if (!ALPHA_VANTAGE_API_KEY || !FINNHUB_API_KEY) {
+//   throw new Error("ALPHA_VANTAGE_API_KEY 또는 FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+// }
 
 const EXCHANGE_RATE_USD_TO_KRW = 1445; // 고정 환율
 
@@ -21,6 +22,11 @@ const EXCHANGE_RATE_USD_TO_KRW = 1445; // 고정 환율
 export const getMarketData = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!ALPHA_VANTAGE_API_KEY) {
+      throw new functions.https.HttpsError("internal", "ALPHA_VANTAGE_API_KEY가 설정되지 않았습니다.");
+    }
+
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -69,6 +75,11 @@ export const getMarketData = functions
 export const buyAsset = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!FINNHUB_API_KEY) {
+      throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
+    }
+
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 호출할 수 있습니다.");
     }
@@ -170,6 +181,11 @@ export const buyAsset = functions
 export const sellAsset = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!FINNHUB_API_KEY) {
+      throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
+    }
+
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 호출할 수 있습니다.");
     }

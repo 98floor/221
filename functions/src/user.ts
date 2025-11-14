@@ -1,8 +1,13 @@
 // functions/src/user.ts
 import * as functions from "firebase-functions/v1";
 import {db, FieldValue} from "./index"; // index.ts에서 db, FieldValue 가져오기
-import * as fs from "fs"; // fs 모듈 임포트
-import * as path from "path"; // path 모듈 임포트
+
+// [수정됨] fs, path 임포트 삭제
+// import * as fs from "fs";
+// import * as path from "path";
+
+// [수정됨] json 파일 직접 임포트
+import * as universities from "./data/universities.json";
 
 // [UC-1] 회원가입 (프로필 생성)
 // (이 로직은 RegisterPage.js가 직접 setDoc을 호출하는 방식)
@@ -60,7 +65,8 @@ export const activateAccount = functions
 // [신규] 닉네임 중복 확인 함수
 export const checkNickname = functions
   .region("asia-northeast3")
-  .https.onCall(async (data, context) => {
+  // [수정됨] (data, context) -> (data, _context)
+  .https.onCall(async (data, _context) => {
     const {nickname} = data;
     if (!nickname) {
       throw new functions.https.HttpsError("invalid-argument", "닉네임을 입력해야 합니다.");
@@ -84,10 +90,12 @@ export const checkNickname = functions
 // [신규] 대학교 목록 가져오기 함수
 export const getUniversities = functions
   .region("asia-northeast3")
-  .https.onCall(async (data, context) => {
+  // [수정됨] (data, context) -> (_data, _context)
+  .https.onCall(async (_data, _context) => {
     try {
-      const filePath = path.join(__dirname, "data", "universities.json");
-      const universities = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      // [수정됨] fs.readFileSync 대신 import한 'universities' 객체 반환
+      // const filePath = path.join(__dirname, "data", "universities.json");
+      // const universities = JSON.parse(fs.readFileSync(filePath, "utf8"));
       return {success: true, universities};
     } catch (error) {
       console.error("대학교 목록 로딩 오류:", error);

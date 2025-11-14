@@ -118,26 +118,57 @@ function RegisterPage() {
       </div>
       <br />
       <FormControl fullWidth style={{marginTop: '10px'}}>
-        <InputLabel>지역</InputLabel>
-        <Select value={selectedRegion} label="지역" onChange={handleRegionChange}>
-          {Object.keys(universities).map(region => (
-            <MenuItem key={region} value={region}>{region}</MenuItem>
+        <InputLabel id="region-label">지역</InputLabel>
+        <Select 
+          labelId="region-label"
+          value={selectedRegion} 
+          label="지역" 
+          onChange={handleRegionChange}
+          // [수정됨] 1. displayEmpty 속성 제거
+          // displayEmpty 
+        >
+          {/* [수정됨] 2. placeholder용 MenuItem 제거
+          <MenuItem value="" disabled>
+            <em>지역을 선택하세요</em>
+          </MenuItem> 
+          */}
+          {Object.keys(universities)
+            .filter(region => region !== 'default') 
+            .map(region => (
+              <MenuItem key={region} value={region}>{region}</MenuItem>
           ))}
         </Select>
       </FormControl>
       <br />
       <FormControl fullWidth style={{marginTop: '10px'}} disabled={!selectedRegion}>
-        <InputLabel>소속 대학</InputLabel>
-        <Select value={schoolName} label="소속 대학" onChange={(e) => setSchoolName(e.target.value)}>
-          {selectedRegion && universities[selectedRegion].map(uni => (
+        <InputLabel id="school-label">소속 대학</InputLabel>
+        <Select 
+          labelId="school-label"
+          value={schoolName} 
+          label="소속 대학" 
+          onChange={(e) => setSchoolName(e.target.value)}
+          // [수정됨] 1. displayEmpty 속성 제거
+          // displayEmpty 
+        >
+          {/* [수정됨] 2. placeholder용 MenuItem 제거
+          <MenuItem value="" disabled>
+            <em>대학을 선택하세요</em>
+          </MenuItem> 
+          */}
+          {selectedRegion && universities[selectedRegion] && universities[selectedRegion].map(uni => (
             <MenuItem key={uni} value={uni}>{uni}</MenuItem>
           ))}
         </Select>
       </FormControl>
       <br />
       <FormControl fullWidth style={{marginTop: '10px'}}>
-        <InputLabel>투자 숙련도</InputLabel>
-        <Select value={userLevel} label="투자 숙련도" onChange={(e) => setUserLevel(e.target.value)}>
+        <InputLabel id="level-label">투자 숙련도</InputLabel>
+        <Select 
+          labelId="level-label"
+          value={userLevel} 
+          label="투자 숙련도" 
+          onChange={(e) => setUserLevel(e.target.value)}
+        >
           <MenuItem value="초급">초급</MenuItem>
           <MenuItem value="중급">중급</MenuItem>
           <MenuItem value="고급">고급</MenuItem>

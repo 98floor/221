@@ -7,15 +7,53 @@ import {db, FieldValue} from "./index"; // index.ts에서 db, FieldValue 가져�
 
 // 이 함수들이 사용하는 상수
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
-if (!FINNHUB_API_KEY) {
-  throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
-}
+
+// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
+// if (!FINNHUB_API_KEY) {
+//   throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
+// }
 const EXCHANGE_RATE_USD_TO_KRW = 1445;
+
+// [신규] 'any' 타입 대신 사용할 인터페이스 정의
+interface Holding {
+  symbol: string;
+  quantity: number;
+  avg_buy_price: number;
+  current_price: number;
+  current_value: number;
+  profit_loss: number;
+  profit_rate: number;
+}
+
+interface PersonalRanking {
+  uid: string;
+  nickname: string;
+  school_name: string;
+  total_asset: number;
+  profit_rate: number;
+}
+
+interface SchoolStat {
+  totalProfitRate: number;
+  memberCount: number;
+}
+
+interface SchoolRanking {
+  school_name: string;
+  avg_profit_rate: number;
+  member_count: number;
+}
+
 
 // [UC-6] 자신의 포트폴리오(자산, 수익률) 확인 (수정본: 환율 적용)
 export const getPortfolio = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!FINNHUB_API_KEY) {
+      throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
+    }
+
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 호출할 수 있습니다.");
     }
@@ -51,7 +89,8 @@ export const getPortfolio = functions
         };
       }
 
-      const holdings: any[] = [];
+      // [수정됨] holdings: any[] -> holdings: Holding[]
+      const holdings: Holding[] = [];
       let totalAssetValue = 0;
 
       const holdingPromises = holdingsSnapshot.docs.map(async (doc) => {
@@ -115,7 +154,14 @@ export const calculateRankings = functions
   .region("asia-northeast3")
   .pubsub.schedule("every 5 minutes")
   .timeZone("Asia/Seoul")
-  .onRun(async (context) => {
+  // [수정됨] (context) -> (_context)
+  .onRun(async (_context) => {
+    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    if (!FINNHUB_API_KEY) {
+      console.error("FINNHUB_API_KEY가 설정되지 않았습니다. 랭킹 집계를 중단합니다.");
+      return; // HttpsError 대신 콘솔 로그 및 반환
+    }
+
     console.log("랭킹 집계 스케줄러(UC-7) 실행 시작...");
 
     const initialCapital = 10000000;
@@ -123,8 +169,10 @@ export const calculateRankings = functions
     try {
       const usersSnapshot = await db.collection("users").get();
 
-      const personalRankings: any[] = [];
-      const schoolStats: any = {};
+      // [수정됨] personalRankings: any[] -> PersonalRanking[]
+      const personalRankings: PersonalRanking[] = [];
+      // [수정됨] schoolStats: any -> {[key: string]: SchoolStat}
+      const schoolStats: {[key: string]: SchoolStat} = {};
 
       const calculationPromises = usersSnapshot.docs.map(async (userDoc) => {
         const userData = userDoc.data();
@@ -191,7 +239,8 @@ export const calculateRankings = functions
 
       personalRankings.sort((a, b) => b.profit_rate - a.profit_rate);
 
-      const schoolRankings: any[] = Object.keys(schoolStats).map((schoolName) => {
+      // [수정됨] schoolRankings: any[] -> SchoolRanking[]
+      const schoolRankings: SchoolRanking[] = Object.keys(schoolStats).map((schoolName) => {
         const stats = schoolStats[schoolName];
         const avgProfitRate = stats.totalProfitRate / stats.memberCount;
         return {
