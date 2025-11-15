@@ -96,7 +96,7 @@ export const voteOnDebate = functions
         });
       });
 
-      return {success: true, message: "투표가 성공적으로 반영되었습니다."};
+      return {success: true, message: `투표가 성공적으로 반영되었습니다. 당신은 ${vote === "pros" ? "찬성" : "반대"}에 투표했습니다.`};
     } catch (error) {
       console.error("투표 처리 오류:", error);
       if (error instanceof functions.https.HttpsError) {

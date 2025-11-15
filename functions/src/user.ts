@@ -126,7 +126,7 @@ export const checkQuizEligibility = functions
       }
       const userCash = userData["virtual_asset"];
       const tryCount = userData["quiz_try_cnt"];
-      console.log("테스트용 임시 로그:", {userCash, initialCapital});
+      console.log("테스트용 임시 로그:", {userCash,initialCapital});
       const isEligibleAsset = userCash <= initialCapital * 0.1;
       const isEligibleCount = tryCount < 2;
       if (isEligibleAsset && isEligibleCount) {
