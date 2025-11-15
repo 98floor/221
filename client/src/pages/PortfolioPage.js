@@ -1,56 +1,99 @@
 // client/src/pages/PortfolioPage.js
 import React, { useState, useEffect } from 'react';
-import { functions } from '../firebase'; // firebase.js에서 functions 임포트
+import { functions, db, auth } from '../firebase'; // [수정됨] db, auth 임포트
 import { httpsCallable } from 'firebase/functions'; // httpsCallable 임포트
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'; // [신규] Firestore 쿼리 도구
+
+// [신규] 헬퍼 함수: Firestore Timestamp 객체를 날짜 문자열로 변환
+const formatDate = (timestamp) => {
+  if (timestamp) {
+    return timestamp.toDate().toLocaleString('ko-KR');
+  }
+  return '날짜 정보 없음';
+};
+
+// [신규] 헬퍼 함수: 숫자를 원화(KRW) 또는 퍼센트(%)로 포맷
+const formatNumber = (num, type = 'krw') => {
+  if (type === 'krw') {
+    return `${Math.round(num).toLocaleString('ko-KR')}원`;
+  } else if (type === 'percent') {
+    return `${num.toFixed(2)}%`;
+  } else if (type === 'qty') {
+    // [신규] 소수점 4자리까지 수량 표시
+    return `${parseFloat(num.toFixed(4)).toLocaleString('ko-KR')}주`;
+  }
+  return num;
+};
 
 function PortfolioPage() {
   const [portfolio, setPortfolio] = useState(null); // 포트폴리오 데이터
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
+  const [errorPortfolio, setErrorPortfolio] = useState(null);
+
+  // [신규] 전체 거래 내역 state
+  const [transactions, setTransactions] = useState([]);
+  const [loadingTx, setLoadingTx] = useState(true);
+  const [errorTx, setErrorTx] = useState(null);
 
   useEffect(() => {
-    // 페이지가 로드될 때 'getPortfolio' Cloud Function을 호출
+    // 1. 포트폴리오(보유 자산) 조회
     const fetchPortfolio = async () => {
       try {
-        // 1. 'getPortfolio' 함수를 준비
         const getPortfolio = httpsCallable(functions, 'getPortfolio');
-
-        // 2. 함수를 호출 (인증된 사용자만 가능)
         const result = await getPortfolio();
-
-        // 3. 반환된 데이터(result.data)를 state에 저장
         setPortfolio(result.data); 
-
       } catch (err) {
         console.error("포트폴리오 조회 실패:", err);
-        setError(err.message);
+        setErrorPortfolio(err.message);
       } finally {
-        setLoading(false);
+        setLoadingPortfolio(false);
       }
     };
 
     fetchPortfolio();
-  }, []); // []는 페이지가 처음 렌더링될 때 한 번만 실행하라는 의미
+
+    // 2. [신규] 전체 거래 내역 (all_time_transactions) 실시간 조회
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) {
+        setLoadingTx(true);
+        // [신규] 영구 보존되는 'all_time_transactions' 컬렉션을 쿼리
+        const txCollectionRef = collection(db, "users", user.uid, "all_time_transactions");
+        const q = query(txCollectionRef, orderBy("trade_dt", "desc"));
+
+        const unsubscribeSnapshot = onSnapshot(q, (querySnapshot) => {
+          const txData = [];
+          querySnapshot.forEach((doc) => {
+            txData.push({ id: doc.id, ...doc.data() });
+          });
+          setTransactions(txData);
+          setLoadingTx(false);
+        }, (err) => {
+          console.error("전체 거래 내역 조회 실패:", err);
+          setErrorTx(err.message);
+          setLoadingTx(false);
+        });
+        
+        return () => unsubscribeSnapshot(); // 하위 리스너 정리
+      } else {
+        // 로그아웃 상태
+        setLoadingTx(false);
+        setTransactions([]);
+      }
+    });
+
+    return () => unsubscribe(); // auth 리스너 정리
+
+  }, []); // []는 페이지가 처음 렌더링될 때 한 번만 실행
 
   // 로딩 중일 때
-  if (loading) {
+  if (loadingPortfolio) {
     return <div>포트폴리오를 불러오는 중...</div>;
   }
 
   // 에러 발생 시
-  if (error) {
-    return <div>오류: {error} (로그인이 필요할 수 있습니다.)</div>;
+  if (errorPortfolio) {
+    return <div>오류: {errorPortfolio} (로그인이 필요할 수 있습니다.)</div>;
   }
-
-  // 헬퍼 함수: 숫자를 원화(KRW) 또는 퍼센트(%)로 포맷
-  const formatNumber = (num, type = 'krw') => {
-    if (type === 'krw') {
-      return `${Math.round(num).toLocaleString('ko-KR')}원`;
-    } else if (type === 'percent') {
-      return `${num.toFixed(2)}%`;
-    }
-    return num;
-  };
 
   // 성공적으로 데이터를 가져왔을 때
   return (
@@ -101,7 +144,7 @@ function PortfolioPage() {
                 {portfolio.holdings.map((stock) => (
                   <tr key={stock.symbol}>
                     <td>{stock.symbol}</td>
-                    <td>{stock.quantity}</td>
+                    <td>{formatNumber(stock.quantity, 'qty')}</td> {/* [수정됨] formatNumber 사용 */}
                     <td>{formatNumber(stock.avg_buy_price)}</td>
                     <td>{formatNumber(stock.current_price)}</td>
                     <td>{formatNumber(stock.current_value)}</td>
@@ -122,6 +165,47 @@ function PortfolioPage() {
       ) : (
         <p>데이터를 불러오지 못했습니다.</p>
       )}
+
+      {/* --- [신규] 전체 거래 내역 섹션 --- */}
+      <hr style={{marginTop: '40px'}} />
+      <h3>전체 거래 내역 (영구 보관)</h3>
+      {loadingTx && <p>전체 거래 내역을 불러오는 중...</p>}
+      {errorTx && <p style={{ color: 'red' }}>오류: {errorTx}</p>}
+      
+      {!loadingTx && !errorTx && transactions.length === 0 && (
+        <p>거래 내역이 없습니다.</p>
+      )}
+
+      {transactions.length > 0 && (
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <table border="1" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>거래 시간</th>
+                <th>종목</th>
+                <th>구분</th>
+                <th>수량</th>
+                <th>거래 단가</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr key={tx.id}>
+                  <td>{formatDate(tx.trade_dt)}</td>
+                  <td>{tx.asset_code}</td>
+                  <td style={{ color: tx.type === 'buy' ? 'red' : 'blue' }}>
+                    {tx.type === 'buy' ? '매수' : '매도'}
+                  </td>
+                  <td>{formatNumber(tx.quantity, 'qty')}</td>
+                  <td>{formatNumber(tx.trade_price, 'krw')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {/* --- [신규] 섹션 끝 --- */}
+
     </div>
   );
 }

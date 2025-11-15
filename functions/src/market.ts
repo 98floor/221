@@ -11,10 +11,7 @@ import {db, FieldValue} from "./index";
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
-// if (!ALPHA_VANTAGE_API_KEY || !FINNHUB_API_KEY) {
-//   throw new Error("ALPHA_VANTAGE_API_KEY 또는 FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
-// }
+// [수정됨] API 키 확인 로직을 각 함수 내부로 이동 (배포 오류 수정)
 
 const EXCHANGE_RATE_USD_TO_KRW = 1445; // 고정 환율
 
@@ -22,7 +19,7 @@ const EXCHANGE_RATE_USD_TO_KRW = 1445; // 고정 환율
 export const getMarketData = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    // [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!ALPHA_VANTAGE_API_KEY) {
       throw new functions.https.HttpsError("internal", "ALPHA_VANTAGE_API_KEY가 설정되지 않았습니다.");
     }
@@ -75,7 +72,7 @@ export const getMarketData = functions
 export const buyAsset = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    // [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
@@ -85,11 +82,8 @@ export const buyAsset = functions
     }
 
     const uid = context.auth.uid;
-    const {symbol, quantity} = data;
-
-    if (quantity <= 0) {
-      throw new functions.https.HttpsError("invalid-argument", "수량은 0보다 커야 합니다.");
-    }
+    // [수정됨] quantity(수량) 또는 amount(금액)를 받음
+    const {symbol, quantity, amount} = data;
 
     try {
       const apiResponse = await axios.get(
@@ -105,7 +99,28 @@ export const buyAsset = functions
         currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
       }
 
-      const totalCost = currentPrice * quantity;
+      // [신규] 주문 수량과 총 비용 계산 로직
+      let quantityToTrade: number;
+      let totalCost: number;
+
+      if (amount) {
+        // --- 1. 금액 주문 (소수점 매매) ---
+        if (amount < 10000) {
+          throw new functions.https.HttpsError("invalid-argument", "최소 주문 금액은 10,000원입니다.");
+        }
+        totalCost = amount;
+        quantityToTrade = amount / currentPrice; // 소수점 수량 계산
+      } else if (quantity) {
+        // --- 2. 기존 수량 주문 ---
+        if (quantity <= 0) {
+          throw new functions.https.HttpsError("invalid-argument", "수량은 0보다 커야 합니다.");
+        }
+        quantityToTrade = quantity;
+        totalCost = currentPrice * quantityToTrade;
+      } else {
+        throw new functions.https.HttpsError("invalid-argument", "수량 또는 금액을 입력해야 합니다.");
+      }
+      // --- 계산 로직 끝 ---
 
       const userRef = db.collection("users").doc(uid);
 
@@ -140,8 +155,10 @@ export const buyAsset = functions
           const oldQuantity = holdingData["quantity"];
           const oldAvgPrice = holdingData["avg_buy_price"];
 
-          const newTotalQuantity = oldQuantity + quantity;
-          const newAvgPrice = ((oldAvgPrice * oldQuantity) + (currentPrice * quantity)) / newTotalQuantity;
+          // [수정됨] quantity -> quantityToTrade 사용
+          const newTotalQuantity = oldQuantity + quantityToTrade;
+          // [수정됨] (currentPrice * quantity) -> (currentPrice * quantityToTrade) 사용
+          const newAvgPrice = ((oldAvgPrice * oldQuantity) + (currentPrice * quantityToTrade)) / newTotalQuantity;
 
           transaction.update(holdingRef, {
             quantity: newTotalQuantity,
@@ -150,19 +167,28 @@ export const buyAsset = functions
         } else {
           transaction.set(holdingRef, {
             asset_code: symbol,
-            quantity: quantity,
+            quantity: quantityToTrade, // [수정됨]
             avg_buy_price: currentPrice,
           });
         }
 
-        const txRef = userRef.collection("transactions").doc();
-        transaction.set(txRef, {
+        // --- [수정됨] 거래 내역을 두 곳에 저장 ---
+        const transactionData = {
           type: "buy",
           asset_code: symbol,
-          quantity: quantity,
+          quantity: quantityToTrade,
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
-        });
+        };
+
+        // 1. 시즌용 거래 내역 (초기화 대상)
+        const txRef = userRef.collection("transactions").doc();
+        transaction.set(txRef, transactionData);
+
+        // 2. 영구 거래 내역 (초기화 안 함)
+        const allTimeTxRef = userRef.collection("all_time_transactions").doc();
+        transaction.set(allTimeTxRef, transactionData);
+        // --- 수정 끝 ---
 
         transaction.update(userRef, {virtual_asset: newCash});
       });
@@ -181,7 +207,7 @@ export const buyAsset = functions
 export const sellAsset = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    // [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
@@ -191,11 +217,8 @@ export const sellAsset = functions
     }
 
     const uid = context.auth.uid;
-    const {symbol, quantity} = data;
-
-    if (quantity <= 0) {
-      throw new functions.https.HttpsError("invalid-argument", "수량은 0보다 커야 합니다.");
-    }
+    // [수정됨] quantity(수량) 또는 amount(금액)를 받음
+    const {symbol, quantity, amount} = data;
 
     try {
       const apiResponse = await axios.get(
@@ -211,7 +234,28 @@ export const sellAsset = functions
         currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
       }
 
-      const totalSaleValue = currentPrice * quantity;
+      // [신규] 주문 수량과 총 매도 금액 계산 로직
+      let quantityToTrade: number;
+      let totalSaleValue: number;
+
+      if (amount) {
+        // --- 1. 금액 주문 (소수점 매매) ---
+        if (amount < 10000) {
+          throw new functions.https.HttpsError("invalid-argument", "최소 주문 금액은 10,000원입니다.");
+        }
+        totalSaleValue = amount;
+        quantityToTrade = amount / currentPrice; // 소수점 수량 계산
+      } else if (quantity) {
+        // --- 2. 기존 수량 주문 ---
+        if (quantity <= 0) {
+          throw new functions.https.HttpsError("invalid-argument", "수량은 0보다 커야 합니다.");
+        }
+        quantityToTrade = quantity;
+        totalSaleValue = currentPrice * quantityToTrade;
+      } else {
+        throw new functions.https.HttpsError("invalid-argument", "수량 또는 금액을 입력해야 합니다.");
+      }
+      // --- 계산 로직 끝 ---
 
       const userRef = db.collection("users").doc(uid);
 
@@ -239,29 +283,39 @@ export const sellAsset = functions
         }
 
         const heldQuantity = holdingData["quantity"];
-        if (heldQuantity < quantity) {
-          throw new functions.https.HttpsError("failed-precondition", "보유 수량이 매도 수량보다 적습니다.");
+        // [수정됨] quantity -> quantityToTrade 사용
+        if (heldQuantity < quantityToTrade) {
+          throw new functions.https.HttpsError("failed-precondition", `보유 수량이 부족합니다. (보유: ${heldQuantity.toFixed(4)} / 요청: ${quantityToTrade.toFixed(4)})`);
         }
 
-        const newHeldQuantity = heldQuantity - quantity;
+        const newHeldQuantity = heldQuantity - quantityToTrade; // [수정됨]
 
-        if (newHeldQuantity === 0) {
+        if (newHeldQuantity <= 0.00001) { // 0에 가까운 작은 수 처리
           transaction.delete(holdingRef);
         } else {
           transaction.update(holdingRef, {quantity: newHeldQuantity});
         }
 
-        const txRef = userRef.collection("transactions").doc();
-        transaction.set(txRef, {
+        // --- [수정됨] 거래 내역을 두 곳에 저장 ---
+        const transactionData = {
           type: "sell",
           asset_code: symbol,
-          quantity: quantity,
+          quantity: quantityToTrade,
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
-        });
+        };
+
+        // 1. 시즌용 거래 내역 (초기화 대상)
+        const txRef = userRef.collection("transactions").doc();
+        transaction.set(txRef, transactionData);
+
+        // 2. 영구 거래 내역 (초기화 안 함)
+        const allTimeTxRef = userRef.collection("all_time_transactions").doc();
+        transaction.set(allTimeTxRef, transactionData);
+        // --- 수정 끝 ---
 
         const userCash = userData["virtual_asset"];
-        const newCash = userCash + totalSaleValue;
+        const newCash = userCash + totalSaleValue; // [수정됨]
         transaction.update(userRef, {virtual_asset: newCash});
       });
 
@@ -272,5 +326,65 @@ export const sellAsset = functions
         throw error;
       }
       throw new functions.https.HttpsError("internal", "매도 처리에 실패했습니다.");
+    }
+  });
+
+
+// [신규 추가] 종목명, 현재가 조회 함수
+export const getStockQuote = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // API 키 확인
+    if (!FINNHUB_API_KEY) {
+      throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
+    }
+    // 인증 확인
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 호출할 수 있습니다.");
+    }
+
+    const symbol = data.symbol;
+    if (!symbol) {
+      throw new functions.https.HttpsError("invalid-argument", "종목 코드(symbol)가 필요합니다.");
+    }
+
+    try {
+      // 1. 현재가 조회 (기존 buy/sell 로직과 동일)
+      const quotePromise = axios.get(
+        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+      );
+
+      // 2. 회사 프로필(이름) 조회
+      const profilePromise = axios.get(
+        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+      );
+
+      // 3. 두 API를 동시에 호출
+      const [quoteResponse, profileResponse] = await Promise.all([
+        quotePromise,
+        profilePromise,
+      ]);
+
+      let currentPrice = quoteResponse.data.c;
+      const stockName = profileResponse.data.name || "이름 정보 없음";
+
+      // 4. 환율 적용
+      if (currentPrice > 0 && !symbol.toUpperCase().endsWith(".KS")) {
+        currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
+      }
+
+      return {
+        success: true,
+        name: stockName,
+        price: currentPrice,
+        change: quoteResponse.data.d, // 금일 변동
+        changePercent: quoteResponse.data.dp, // 금일 변동률 (%)
+        open: quoteResponse.data.o, // 시가
+        high: quoteResponse.data.h, // 고가
+        low: quoteResponse.data.l, // 저가
+      };
+    } catch (error) {
+      console.error("Finnhub API (quote/profile) 호출 오류:", error);
+      throw new functions.https.HttpsError("internal", "종목 정보 조회에 실패했습니다.");
     }
   });

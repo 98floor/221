@@ -9,10 +9,7 @@ import {getAuth} from "firebase-admin/auth";
 // 이 함수들이 사용하는 상수
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-// 🔽 [수정됨] 파일 로드 시 즉시 실행되던 API 키 확인 로직 제거
-// if (!FINNHUB_API_KEY) {
-//   throw new Error("FINNHUB_API_KEY가 .env 파일에 설정되지 않았습니다.");
-// }
+// [수정됨] API 키 확인 로직을 각 함수 내부로 이동 (배포 오류 수정)
 const EXCHANGE_RATE_USD_TO_KRW = 1445;
 
 // [신규] 관리자 지정 함수
@@ -137,7 +134,7 @@ export const toggleUserSuspension = functions
 export const endSeason = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
+    // [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
@@ -192,15 +189,30 @@ export const endSeason = functions
         const totalPortfolioValue = userCash + totalAssetValue;
         const profitRate = ((totalPortfolioValue - initialCapital) / initialCapital) * 100;
 
-        // (B) 자산 초기화 ...
+        // (B) 자산 초기화 (holdings, transactions) ...
         const batch = db.batch();
+
+        // [신규] 시즌 거래내역(transactions) 컬렉션 스냅샷 가져오기
+        const transactionsRef = userDoc.ref.collection("transactions");
+        const transactionsSnapshot = await transactionsRef.get();
+
+        // 1. holdings 삭제
         holdingsSnapshot.forEach((doc) => {
           batch.delete(doc.ref);
         });
+
+        // 2. [신규] transactions 삭제 (all_time_transactions는 보존)
+        transactionsSnapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+
+        // 3. 유저 자산/퀴즈 상태 초기화
         batch.update(userDoc.ref, {
           virtual_asset: initialCapital,
           quiz_try_cnt: 0,
         });
+
+        // 4. 배치 실행
         await batch.commit();
 
         // (C) 랭킹 데이터 반환
