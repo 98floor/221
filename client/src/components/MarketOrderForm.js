@@ -4,8 +4,21 @@ import { functions, auth, db } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, onSnapshot } from "firebase/firestore"; 
 
-// 👈 [수정됨] MUI 컴포넌트 사용 (InputAdornment, Tabs, Tab 등)
-import { Box, Typography, TextField, Button, CircularProgress, Tabs, Tab, InputAdornment } from '@mui/material';
+// 👈 [수정됨] MUI 컴포넌트 사용 (ButtonGroup 추가)
+import { Box, Typography, TextField, Button, CircularProgress, Tabs, Tab, ButtonGroup } from '@mui/material';
+
+// [신규] 소수점 4자리까지 자르는 헬퍼 함수
+const truncateQuantity = (num) => {
+  if (isNaN(num) || !isFinite(num) || num === 0) return ''; // 0, NaN, Infinity는 빈 문자열로
+  const truncated = Math.floor(num * 10000) / 10000;
+  return truncated.toString();
+};
+
+// [신규] 금액 포맷 헬퍼 함수
+const formatAmount = (num) => {
+  if (isNaN(num) || !isFinite(num) || num === 0) return '';
+  return Math.floor(num).toString();
+}
 
 // [수정됨] stockInfo prop (가격 정보) 추가
 function OrderForm({ symbol, stockInfo }) {
@@ -13,6 +26,9 @@ function OrderForm({ symbol, stockInfo }) {
   
   const [quantity, setQuantity] = useState(''); // 수량 주문 state
   const [orderAmount, setOrderAmount] = useState(''); // 금액 주문 state
+
+  // [신규] 사용자의 마지막 입력을 추적 (qty | amt)
+  const [orderMode, setOrderMode] = useState('amt'); 
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -23,6 +39,7 @@ function OrderForm({ symbol, stockInfo }) {
 
   // [신규] 부모로부터 받은 현재가
   const currentPrice = stockInfo ? stockInfo.price : 0;
+  const percentages = [0.1, 0.25, 0.5, 1.0]; // 비율 버튼
 
   // 보유 현금 실시간 로드
   useEffect(() => {
@@ -66,121 +83,94 @@ function OrderForm({ symbol, stockInfo }) {
     setQuantity('');
     setOrderAmount('');
     setMessage('');
+    setOrderMode('amt'); // 탭 변경 시 기본 모드 '금액'으로
   };
 
-  // 수량 입력 시, 금액 입력 초기화
+  // --- [신규] 연동 핸들러 ---
+  // [수정됨] 수량 입력 시, 금액 자동 계산
   const handleQuantityChange = (value) => {
     setQuantity(value);
-    setOrderAmount(''); 
+    setOrderMode('qty'); // 마지막 입력: 수량
+    if (currentPrice > 0) {
+      const numValue = parseFloat(value) || 0;
+      setOrderAmount(formatAmount(numValue * currentPrice));
+    } else {
+      setOrderAmount(''); // 가격 없으면 비우기
+    }
   };
 
-  // 금액 입력 시, 수량 입력 초기화
+  // [수정됨] 금액 입력 시, 수량 자동 계산
   const handleAmountChange = (value) => {
     setOrderAmount(value);
-    setQuantity(''); 
-  };
-
-  // --- [신규] '최대' 버튼 핸들러 4개 ---
-  
-  // 1. 매수 탭 - 수량 '최대' (현금 / 현재가)
-  const handleMaxBuyQuantity = () => {
-    if (currentPrice > 0 && availableCash >= 10000) {
-      const maxQty = availableCash / currentPrice;
-      // 소수점 4자리까지 내림
-      setQuantity(Math.floor(maxQty * 10000) / 10000); 
-      setOrderAmount(''); 
+    setOrderMode('amt'); // 마지막 입력: 금액
+    if (currentPrice > 0) {
+      const numValue = parseFloat(value) || 0;
+      setQuantity(truncateQuantity(numValue / currentPrice));
+    } else {
+      setQuantity(''); // 가격 없으면 비우기
     }
   };
 
-  // 2. 매수 탭 - 금액 '최대' (현금)
-  const handleMaxBuyAmount = () => {
-    if (availableCash >= 10000) {
-      setOrderAmount(Math.floor(availableCash)); // 정수로 내림
-      setQuantity(''); 
-    }
-  };
-
-  // 3. 매도 탭 - 수량 '최대' (보유 수량)
-  const handleMaxSellQuantity = () => {
-    if (heldQuantity > 0) {
-      setQuantity(heldQuantity); 
-      setOrderAmount(''); 
-    }
-  };
-  
-  // 4. 매도 탭 - 금액 '최대' (보유 수량 * 현재가)
-  const handleMaxSellAmount = () => {
-    if (currentPrice > 0 && heldQuantity > 0) {
+  // [신규] 비율 버튼 클릭 핸들러
+  const handlePercentClick = (percent) => {
+    let newAmount = 0;
+    if (tabIndex === 0) {
+      // '매수' 탭: 보유 현금 기준
+      newAmount = availableCash * percent;
+    } else {
+      // '매도' 탭: 총 평가액 (보유수량 * 현재가) 기준
       const maxAmount = heldQuantity * currentPrice;
-      setOrderAmount(Math.floor(maxAmount)); // 정수로 내림
-      setQuantity('');
+      newAmount = maxAmount * percent;
     }
+    // 금액 입력을 기준으로 수량까지 자동 변경
+    handleAmountChange(formatAmount(newAmount)); 
   };
   // --- 핸들러 끝 ---
 
-  // [UC-4] 매수 함수
-  const handleBuy = async () => {
+  // [신규] 매수/매도 로직 통합
+  const handleSubmit = async (tradeType) => { // 'buy' 또는 'sell'
     setLoading(true);
     setMessage('');
+
     try {
-      const buyAsset = httpsCallable(functions, 'buyAsset');
+      const func = (tradeType === 'buy') ? 
+        httpsCallable(functions, 'buyAsset') : 
+        httpsCallable(functions, 'sellAsset');
+      
       const payload = { symbol: symbol };
       
-      if (quantity > 0) {
-        payload.quantity = Number(quantity);
-      } else if (orderAmount > 0) {
-        if (orderAmount < 10000) throw new Error('최소 주문 금액은 10,000원입니다.');
-        payload.amount = Number(orderAmount);
-      } else {
-        throw new Error('주문 수량 또는 금액을 입력하세요.');
+      // [수정됨] 마지막 입력(orderMode)을 기준으로 payload 구성
+      if (orderMode === 'amt') {
+        const amountNum = parseFloat(orderAmount) || 0;
+        if (amountNum < 10000) throw new Error('최소 주문 금액은 10,000원입니다.');
+        payload.amount = amountNum;
+      } else { // orderMode === 'qty'
+        const quantityNum = parseFloat(quantity) || 0;
+        if (quantityNum <= 0) throw new Error('주문 수량은 0보다 커야 합니다.');
+        payload.quantity = quantityNum;
       }
       
-      const result = await buyAsset(payload);
+      const result = await func(payload);
       setMessage(result.data.message);
       setQuantity('');
       setOrderAmount('');
+
     } catch (err) {
-      console.error("매수 실패:", err);
-      setMessage(`매수 실패: ${err.message}`);
+      console.error(`${tradeType} 실패:`, err);
+      setMessage(`${tradeType === 'buy' ? '매수' : '매도'} 실패: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // [UC-5] 매도 함수
-  const handleSell = async () => {
-    setLoading(true);
-    setMessage('');
-    try {
-      const sellAsset = httpsCallable(functions, 'sellAsset');
-      const payload = { symbol: symbol };
-
-      if (quantity > 0) {
-        payload.quantity = Number(quantity);
-      } else if (orderAmount > 0) {
-        if (orderAmount < 10000) throw new Error('최소 주문 금액은 10,000원입니다.');
-        payload.amount = Number(orderAmount);
-      } else {
-        throw new Error('주문 수량 또는 금액을 입력하세요.');
-      }
-      
-      const result = await sellAsset(payload);
-      setMessage(result.data.message);
-      setQuantity('');
-      setOrderAmount('');
-    } catch (err) {
-      console.error("매도 실패:", err);
-      setMessage(`매도 실패: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
-    <Box sx={{ border: '1px solid #ddd', padding: 2, borderRadius: 1 }}>
-      <Typography variant="h6" gutterBottom>
-        주문 (UC-4, 5)
-      </Typography>
+    // [수정됨] 상위 Box의 padding, border 등 제거 (MarketPage.js로 이동)
+    <Box> 
+      {/* [수정됨] H6 제목 제거 (MarketPage.js의 "주문" 탭이 제목 역할) */}
+      {/* <Typography variant="h6" gutterBottom>
+      </Typography> 
+      */}
 
       {/* --- 보유 현금 / 보유 수량 표시 --- */}
       <Box sx={{ mt: 2, mb: 1, display: 'flex', justifyContent: 'space-between' }}>
@@ -201,7 +191,7 @@ function OrderForm({ symbol, stockInfo }) {
             보유 수량 ({symbol || '...'})
           </Typography>
           <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-            {parseFloat(heldQuantity.toFixed(4)).toLocaleString('ko-KR')} 주
+            {parseFloat(heldQuantity.toFixed(4)).toLocaleString('ko-KR')}
           </Typography>
         </Box>
       </Box>
@@ -209,7 +199,7 @@ function OrderForm({ symbol, stockInfo }) {
       {/* --- 종목 코드 (부모로부터 받음) --- */}
       <TextField
         label="종목 코드"
-        value={symbol || '종목을 검색하세요'}
+        value={symbol}
         disabled 
         fullWidth
         sx={{ mt: 1, mb: 2 }}
@@ -219,18 +209,14 @@ function OrderForm({ symbol, stockInfo }) {
       {/* --- '매수' / '매도' 탭 UI --- */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabIndex} onChange={handleTabChange} variant="fullWidth">
-          <Tab label="매수" sx={{ color: 'red' }} />
-          <Tab label="매도" sx={{ color: 'blue' }} />
+          {/* [수정됨] sx 속성 (color) 제거 */}
+          <Tab label="매수" />
+          <Tab label="매도" />
         </Tabs>
       </Box>
 
-      {/* --- 탭 패널 0: 매수 탭 --- */}
-      <Box 
-        role="tabpanel"
-        hidden={tabIndex !== 0}
-        id="buy-tabpanel"
-        sx={{ pt: 2 }}
-      >
+      {/* --- 탭 패널 공통 (입력창) --- */}
+      <Box sx={{ pt: 2 }}>
         <TextField
           label="수량"
           type="number"
@@ -238,20 +224,6 @@ function OrderForm({ symbol, stockInfo }) {
           onChange={(e) => handleQuantityChange(e.target.value)}
           fullWidth
           sx={{ mb: 2 }}
-          // [수정됨] 매수 - 수량 - '최대' 버튼
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <Button
-                  size="small"
-                  onClick={handleMaxBuyQuantity}
-                  disabled={availableCash < 10000 || currentPrice <= 0 || !stockInfo}
-                >
-                  최대
-                </Button>
-              </InputAdornment>
-            ),
-          }}
         />
         <TextField
           label="주문 금액 (KRW)"
@@ -261,25 +233,42 @@ function OrderForm({ symbol, stockInfo }) {
           fullWidth
           sx={{ mb: 2 }}
           helperText="최소 주문 금액: 10,000 KRW"
-          // [수정됨] 매수 - 금액 - '최대' 버튼
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <Button
-                  size="small"
-                  onClick={handleMaxBuyAmount}
-                  disabled={availableCash < 10000}
-                >
-                  최대
-                </Button>
-              </InputAdornment>
-            ),
-          }}
         />
+      </Box>
+
+      {/* --- [신규] 비율 버튼 (탭에 따라 기능 변경) --- */}
+      <Box sx={{ mb: 2 }}>
+        {/* [수정됨] variant="outlined" -> variant="text" */}
+        <ButtonGroup size="small" variant="text" fullWidth>
+          {percentages.map((p) => {
+            // 탭에 따라 버튼 비활성화 로직 결정
+            const isDisabled = (tabIndex === 0) ? // 매수 탭
+              (availableCash < 10000 || !stockInfo) : // 매도 탭
+              (heldQuantity <= 0 || currentPrice <= 0 || !stockInfo);
+
+            return (
+              <Button
+                key={p}
+                onClick={() => handlePercentClick(p)}
+                disabled={isDisabled}
+              >
+                {p * 100}%
+              </Button>
+            );
+          })}
+        </ButtonGroup>
+      </Box>
+
+      {/* --- 탭 패널 0: 매수 버튼 --- */}
+      <Box 
+        role="tabpanel"
+        hidden={tabIndex !== 0}
+        id="buy-tabpanel"
+      >
         <Button 
           variant="contained" 
           color="error" // '매수' 버튼
-          onClick={handleBuy} 
+          onClick={() => handleSubmit('buy')} 
           disabled={loading || !symbol}
           fullWidth
           size="large"
@@ -289,62 +278,16 @@ function OrderForm({ symbol, stockInfo }) {
         </Button>
       </Box>
 
-      {/* --- 탭 패널 1: 매도 탭 --- */}
+      {/* --- 탭 패널 1: 매도 버튼 --- */}
       <Box 
         role="tabpanel"
         hidden={tabIndex !== 1}
         id="sell-tabpanel"
-        sx={{ pt: 2 }}
       >
-        <TextField
-          label="수량"
-          type="number"
-          value={quantity}
-          onChange={(e) => handleQuantityChange(e.target.value)}
-          fullWidth
-          sx={{ mb: 2 }}
-          // [수정됨] 매도 - 수량 - '최대' 버튼
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <Button
-                  size="small"
-                  onClick={handleMaxSellQuantity}
-                  disabled={heldQuantity <= 0}
-                >
-                  최대
-                </Button>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <TextField
-          label="주문 금액 (KRW)"
-          type="number"
-          value={orderAmount}
-          onChange={(e) => handleAmountChange(e.target.value)}
-          fullWidth
-          sx={{ mb: 2 }}
-          helperText="최소 주문 금액: 10,000 KRW"
-          // [수정됨] 매도 - 금액 - '최대' 버튼
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <Button
-                  size="small"
-                  onClick={handleMaxSellAmount}
-                  disabled={heldQuantity <= 0 || currentPrice <= 0 || !stockInfo}
-                >
-                  최대
-                </Button>
-              </InputAdornment>
-            ),
-          }}
-        />
         <Button 
           variant="contained" 
           color="primary" // '매도' 버튼
-          onClick={handleSell} 
+          onClick={() => handleSubmit('sell')} 
           disabled={loading || !symbol}
           fullWidth
           size="large"

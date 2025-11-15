@@ -365,18 +365,24 @@ export const getStockQuote = functions
         profilePromise,
       ]);
 
-      let currentPrice = quoteResponse.data.c;
+      const usdPrice = quoteResponse.data.c; // 원본 USD 가격
       const stockName = profileResponse.data.name || "이름 정보 없음";
+      const isKrwStock = symbol.toUpperCase().endsWith(".KS"); // 국내 주식 여부
 
-      // 4. 환율 적용
-      if (currentPrice > 0 && !symbol.toUpperCase().endsWith(".KS")) {
-        currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
+      let krwPrice = usdPrice; // 기본값
+
+      // 4. 환율 적용 (국내 주식이 아닐 때만)
+      if (usdPrice > 0 && !isKrwStock) {
+        krwPrice = usdPrice * EXCHANGE_RATE_USD_TO_KRW; // 원화 계산
       }
 
       return {
         success: true,
         name: stockName,
-        price: currentPrice,
+        price: krwPrice, // 기존 호환성을 위해 유지 (원화)
+        price_krw: krwPrice, // 명시적인 원화 가격
+        price_usd: usdPrice, // 명시적인 USD 가격
+        is_krw_stock: isKrwStock, // 국내 주식 여부 플래그
         change: quoteResponse.data.d, // 금일 변동
         changePercent: quoteResponse.data.dp, // 금일 변동률 (%)
         open: quoteResponse.data.o, // 시가

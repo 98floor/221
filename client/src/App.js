@@ -1,6 +1,7 @@
 // client/src/App.js
 import React, { useState, useEffect } from 'react'; 
-import { BrowserRouter as Router, Routes, Route, Link as RouterLink } from 'react-router-dom'; 
+// [수정됨] Link as RouterLink, useLocation 임포트
+import { BrowserRouter as Router, Routes, Route, Link as RouterLink, useLocation } from 'react-router-dom'; 
 
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -10,7 +11,6 @@ import { useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // --- 페이지 임포트 ---
-// (이전과 동일)
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -23,13 +23,13 @@ import DebatePage from './pages/DebatePage';
 import QuizPage from './pages/QuizPage';
 import ChatbotPage from './pages/ChatbotPage';
 import AdminPage from './pages/AdminPage';
-import NoticePage from './pages/NoticePage'; // 공지사항 페이지 임포트
+import NoticePage from './pages/NoticePage'; 
 import PasswordResetPage from './pages/PasswordResetPage';
 
-
-function App() {
+// [신규] App 컴포넌트의 내용을 분리 (useLocation 훅을 사용하기 위함)
+function AppContent() {
   const navLinks = [
-    { name: '공지사항', path: '/notice' }, // 공지사항 링크 추가
+    { name: '공지사항', path: '/notice' }, 
     { name: '거래소', path: '/market' },
     { name: '자산', path: '/portfolio' },
     { name: '랭킹', path: '/ranking' },
@@ -38,11 +38,11 @@ function App() {
     { name: '토론 배틀', path: '/debate' },
     { name: '퀴즈', path: '/quiz' },
     { name: 'AI 챗봇', path: '/chatbot' },
-    { name: '관리자', path: '/admin', adminOnly: true }, // adminOnly 속성 추가
+    { name: '관리자', path: '/admin', adminOnly: true }, 
   ];
 
   const { user, role, loading } = useAuth(); // useAuth 훅 사용
-
+  
   // --- 로그아웃 핸들러 ---
   const handleLogout = async () => {
     if (!window.confirm("로그아웃 하시겠습니까?")) return;
@@ -57,10 +57,11 @@ function App() {
   };
 
   return (
-    <Router> 
+    <>
       {/* --- MUI AppBar (네비게이션) --- */}
       <AppBar position="static" color="default" elevation={1} sx={{ backgroundColor: 'white' }}>
-        <Container maxWidth="lg">
+        {/* [수정됨] Container의 maxWidth를 'xl'로 변경 */}
+        <Container maxWidth="xl">
           <Toolbar disableGutters>
 
             {/* 1. 로고 (홈으로 이동) */}
@@ -91,7 +92,7 @@ function App() {
             }}>
               {navLinks.map((link) => {
                 if (link.adminOnly && role !== 'admin') {
-                  return null; // 관리자 전용 링크이고 관리자가 아니면 렌더링하지 않음
+                  return null; 
                 }
                 return (
                   <Button
@@ -165,8 +166,12 @@ function App() {
         </Container>
       </AppBar>
 
-      {/* --- 페이지 컨텐츠 영역 --- */}
-      <Container maxWidth="lg" sx={{ marginTop: 3 }}>
+      {/* --- [수정됨] 페이지 컨텐츠 영역 --- */}
+      <Container 
+        // [수정됨] 모든 페이지에 'xl' (1536px) 너비를 적용.
+        maxWidth="xl" 
+        sx={{ marginTop: 3 }}
+      >
         <Routes>
           {/* HomePage에 user prop을 전달. */}
           <Route path="/" element={<HomePage user={user} />} /> 
@@ -193,7 +198,15 @@ function App() {
           />
         </Routes>
       </Container>
+    </>
+  );
+}
 
+// [신규] App 컴포넌트는 Router만 렌더링
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
