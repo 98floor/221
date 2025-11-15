@@ -137,6 +137,23 @@ function AdminPage() {
     }
   };
 
+  const handleCloseDebate = async (debateId) => {
+    const correctAnswer = window.prompt("정답을 입력하세요 (O 또는 X):");
+    if (correctAnswer !== 'O' && correctAnswer !== 'X') {
+      alert("정답은 반드시 'O' 또는 'X' 여야 합니다.");
+      return;
+    }
+    setDebateMessage('토론 마감 처리 중...');
+    try {
+      const closeDebateFunc = httpsCallable(functions, 'closeDebate');
+      const result = await closeDebateFunc({ debateId, correctAnswer });
+      setDebateMessage(result.data.message);
+      fetchAllAdminData();
+    } catch (err) {
+      setDebateMessage(`마감 실패: ${err.message}`);
+    }
+  };
+
   const handleDeleteDebate = async (debateId) => {
     if (!window.confirm('정말로 이 토론을 삭제하시겠습니까?')) return;
     setDebateMessage('토론 주제 삭제 중...');
@@ -234,14 +251,25 @@ function AdminPage() {
       </div>
 
       <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
-        <h3>토론 관리</h3>
+        <h3>O/X 예측 관리</h3>
         {debateMessage && <p>{debateMessage}</p>}
         <form onSubmit={handleCreateDebate}>
-          <input type="text" value={newDebateTopic} onChange={(e) => setNewDebateTopic(e.target.value)} placeholder="새 토론 주제" required />
-          <button type="submit">토론 생성</button>
+          <input type="text" value={newDebateTopic} onChange={(e) => setNewDebateTopic(e.target.value)} placeholder="새 예측 주제" required />
+          <button type="submit">예측 생성</button>
         </form>
-        {loadingDebates ? <p>토론 로딩 중...</p> : (
-          <ul>{debates.map(d => (<li key={d.id}>"{d.topic}" <button onClick={() => handleDeleteDebate(d.id)}>삭제</button></li>))}</ul>
+        {loadingDebates ? <p>예측 로딩 중...</p> : (
+          <ul>{debates.map(d => (
+            <li key={d.id}>
+              "{d.topic}" 
+              <span style={{ marginLeft: '10px', color: d.status === 'closed' ? 'blue' : 'green' }}>
+                ({d.status === 'closed' ? `마감됨 - 정답: ${d.correctAnswer}` : '진행중'})
+              </span>
+              {d.status !== 'closed' && (
+                <button onClick={() => handleCloseDebate(d.id)} style={{ marginLeft: '10px' }}>마감</button>
+              )}
+              <button onClick={() => handleDeleteDebate(d.id)} style={{ marginLeft: '10px' }}>삭제</button>
+            </li>
+          ))}</ul>
         )}
       </div>
 

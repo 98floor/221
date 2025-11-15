@@ -15,19 +15,24 @@ const DebateTopic = ({ debate, user, onVote }) => {
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '20px 0' }}>
         <div style={{ textAlign: 'center', marginRight: '50px' }}>
-          <button onClick={() => onVote(debate.id, 'pros')} disabled={!!userVote} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'pros' ? 'lightblue' : '' }}>
-             찬성
+          <button onClick={() => onVote(debate.id, 'O')} disabled={!!userVote || debate.status === 'closed'} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'O' ? 'lightblue' : '' }}>
+             O
           </button>
-          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.pros}</p>
+          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.o_votes}</p>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <button onClick={() => onVote(debate.id, 'cons')} disabled={!!userVote} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'cons' ? 'lightcoral' : '' }}>
-             반대
+          <button onClick={() => onVote(debate.id, 'X')} disabled={!!userVote || debate.status === 'closed'} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'X' ? 'lightcoral' : '' }}>
+             X
           </button>
-          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.cons}</p>
+          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.x_votes}</p>
         </div>
       </div>
-      {userVote && <p style={{ textAlign: 'center' }}>당신은 '{userVote === 'pros' ? '찬성' : '반대'}'에 투표했습니다.</p>}
+      {userVote && <p style={{ textAlign: 'center' }}>당신은 '{userVote}'에 투표했습니다.</p>}
+      {debate.status === 'closed' && (
+        <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: 'bold', color: 'blue' }}>
+          <p>마감된 예측입니다. (정답: {debate.correctAnswer})</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -78,7 +83,7 @@ function DebatePage() {
 
   return (
     <div>
-      <h2>투자 토론 배틀 (UC-12)</h2>
+      <h2>O/X 예측</h2>
       {voteMessage && <p style={{ fontWeight: 'bold' }}>{voteMessage}</p>}
 
       {debates.length > 0 ? (

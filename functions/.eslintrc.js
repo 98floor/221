@@ -31,6 +31,6 @@ module.exports = {
     "import/no-unresolved": 0,
     "indent": ["error", 2],
     "linebreak-style": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": ["warn", {"argsIgnorePattern": "^_"}],
   },
 };

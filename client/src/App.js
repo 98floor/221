@@ -35,7 +35,7 @@ function AppContent() {
     { name: '랭킹', path: '/ranking' },
     { name: '명예의 전당', path: '/hall-of-fame' },
     { name: '게시판', path: '/community' },
-    { name: '토론 배틀', path: '/debate' },
+    { name: 'O/X 예측', path: '/debate' },
     { name: '퀴즈', path: '/quiz' },
     { name: 'AI 챗봇', path: '/chatbot' },
     { name: '관리자', path: '/admin', adminOnly: true }, 
