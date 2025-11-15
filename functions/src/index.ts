@@ -31,4 +31,5 @@ export * from "./notice";
 export * from "./quiz";
 export * from "./debate";
 export * from "./orders";
-export * from "./favorites"; // [신규 추가]
+export * from "./favorites";
+export * from "./news";

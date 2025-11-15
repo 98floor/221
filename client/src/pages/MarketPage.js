@@ -1,6 +1,6 @@
 // client/src/pages/MarketPage.js
 import React, { useState, useEffect } from 'react';
-import { Grid, Box, Typography, Tabs, Tab, IconButton } from '@mui/material';
+import { Grid, Box, Typography, IconButton } from '@mui/material';
 import { Star, StarBorder } from '@mui/icons-material';
 import { functions, auth } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -11,6 +11,7 @@ import MarketOrderForm from '../components/MarketOrderForm';
 import TradingViewWidget from '../components/TradingViewWidget';
 import TransactionHistory from '../components/TransactionHistory';
 import FavoritesList from '../components/FavoritesList';
+import NewsList from '../components/NewsList';
 
 // Cloud Functions
 const getStockQuote = httpsCallable(functions, 'getStockQuote');
@@ -24,13 +25,9 @@ const formatNumber = (num, type = 'krw') => {
   if (type === 'krw') {
     return `${Math.round(num).toLocaleString('ko-KR')} KRW`;
   }
-
   if (type === 'usd') {
-    // USD는 보통 소수점 2자리
     return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
-
-  // 퍼센트
   return `${num.toFixed(2)}%`;
 };
 
@@ -41,7 +38,6 @@ const getColor = (num) => {
   return 'black';
 };
 
-
 function MarketPage() {
   const [searchInput, setSearchInput] = useState('AAPL');
   const [loading, setLoading] = useState(false);
@@ -49,17 +45,13 @@ function MarketPage() {
 
   const [activeSymbol, setActiveSymbol] = useState('');
   const [stockInfo, setStockInfo] = useState(null);
-  const [mainTabIndex, setMainTabIndex] = useState(0); // "주문" / "거래내역" 탭
 
-  // --- Favorites State ---
+  // 즐겨찾기 State
   const [favorites, setFavorites] = useState(new Set());
   const [refreshFavsTrigger, setRefreshFavsTrigger] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
-  // ---
 
-  const handleMainTabChange = (event, newValue) => { setMainTabIndex(newValue); };
-
-  // 로그인/로그아웃 시 즐겨찾기 목록 불러옴
+  // 로그인 시 즐겨찾기 목록 로딩
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -72,18 +64,18 @@ function MarketPage() {
           })
           .catch(err => console.error("Failed to load favorites symbols", err));
       } else {
-        setFavorites(new Set()); // 로그아웃 시 초기화
+        setFavorites(new Set());
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // '별' 아이콘 상태 업데이트
+  // 현재 종목이 즐겨찾기인지 체크
   useEffect(() => {
     setIsFavorite(favorites.has(activeSymbol));
   }, [activeSymbol, favorites]);
 
-  // 검색 함수
+  // 종목 검색 처리
   const handleSearch = async (symbolToSearch) => {
     if (!symbolToSearch || symbolToSearch.trim() === '') {
       setError("종목 코드를 입력해주세요.");
@@ -103,7 +95,7 @@ function MarketPage() {
         throw new Error(result.data.message || "정보 조회 실패");
       }
       setActiveSymbol(upperSymbol);
-      setSearchInput(upperSymbol); // 검색창 입력값도 동기화
+      setSearchInput(upperSymbol);
     } catch (err) {
       console.error("종목 정보 조회 실패:", err);
       setError(`[${upperSymbol}] ${err.message}`);
@@ -120,7 +112,6 @@ function MarketPage() {
     const currentName = stockInfo.name;
     try {
       if (isFavorite) {
-        // --- 제거 ---
         await removeFavorite({ symbol: activeSymbol });
         setFavorites(prev => {
           const newSet = new Set(prev);
@@ -128,7 +119,6 @@ function MarketPage() {
           return newSet;
         });
       } else {
-        // --- 추가 ---
         await addFavorite({ symbol: activeSymbol, name: currentName });
         setFavorites(prev => new Set(prev).add(activeSymbol));
       }
@@ -139,74 +129,74 @@ function MarketPage() {
     }
   };
 
-  // 즐겨찾기 목록 클릭
+  // 즐겨찾기 클릭
   const handleFavoriteClick = (symbol) => {
     handleSearch(symbol);
   };
 
   return (
-    // App.js의 Container가 여백을 관리하므로 sx={{ p: 3 }} 제거
     <Box>
 
-      {/* [수정됨] 
-          1. justifyContent="center" 제거
-          2. 비율 9:3으로 변경
-      */}
-      <Grid
-        container
-        spacing={2}
-      // justifyContent="center" // 👈 제거
-      >
+      {/* 전체 레이아웃 */}
+      <Grid container spacing={2}>
 
-        {/* --- 1. 좌측 패널 (차트, 주문) [수정됨: 9] --- */}
+        {/* 1. 좌측: 차트 + 주문/거래내역 */}
         <Grid
           item
           xs={12}
           md={9}
           lg={9}
           sx={{
-            minWidth: 0,          // flexbox width 계산 안정화
-            width: '70%',        // 좌측 패널 항상 꽉 채움
+            minWidth: 0,
+            width: '65%',
             display: 'flex',
             flexDirection: 'column'
           }}
         >
-          {/* 1-1. 차트 */}
+          {/* 차트 */}
           {activeSymbol ? (
             <TradingViewWidget symbol={activeSymbol} />
           ) : (
-            <Box sx={{ height: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f4f4f4' }}>
+            <Box sx={{
+              height: 500,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f4f4f4'
+            }}>
               <Typography color="textSecondary">
                 종목 코드를 검색하면 차트가 표시됩니다. (예: AAPL, GOOGL)
               </Typography>
             </Box>
           )}
 
-          {/* 1-2. 주문/거래내역 탭 */}
-          <Box sx={{ border: '1px solid #ddd', borderRadius: 1, mt: 2 }}>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={mainTabIndex} onChange={handleMainTabChange} variant="fullWidth">
-                <Tab label="주문" />
-                <Tab label="거래내역" />
-              </Tabs>
-            </Box>
-            <Box hidden={mainTabIndex !== 0} sx={{ p: 3 }}>
-              <MarketOrderForm symbol={activeSymbol} stockInfo={stockInfo} />
-            </Box>
-            <Box hidden={mainTabIndex !== 1} sx={{ p: 3 }}>
-              <TransactionHistory symbol={activeSymbol} />
-            </Box>
+          {/* 주문 + 거래내역 나란히 배치 */}
+          <Box
+            sx={{
+              border: '1px solid #ddd',
+              borderRadius: 1,
+              mt: 2,
+              p: 2
+            }}
+          >
+            <Grid container spacing={2}>
+              {/* 주문폼 */}
+              <Grid item xs={12} md={6}>
+                <MarketOrderForm symbol={activeSymbol} stockInfo={stockInfo} />
+              </Grid>
+
+              {/* 거래내역 */}
+              <Grid item xs={12} md={6}>
+                <TransactionHistory symbol={activeSymbol} />
+              </Grid>
+            </Grid>
           </Box>
         </Grid>
 
-        {/* --- 2. 우측 패널 (검색, 정보, 즐겨찾기) [수정됨: 3] --- */}
-        <Grid
-          item
-          xs={12}
-          md={3} // 👉 9:3 비율
-          lg={3} // 👉 9:3 비율
-        >
-          {/* 2-1. 검색창 */}
+        {/* 2. 우측: 검색창 + 종목 정보 + 즐겨찾기 + 뉴스 */}
+        <Grid item xs={12} md={3} lg={3} sx={{ minWidth: 0 }}>
+
+          {/* 검색창 */}
           <div style={{ display: 'flex', marginBottom: '10px' }}>
             <input
               type="text"
@@ -216,13 +206,17 @@ function MarketPage() {
               placeholder="종목 코드 검색 (예: AAPL)"
               style={{ flexGrow: 1, padding: '10px', border: '1px solid #ccc' }}
             />
-            <button onClick={() => handleSearch(searchInput)} disabled={loading} style={{ padding: '10px 15px', border: '1px solid #ccc', borderLeft: 'none' }}>
+            <button
+              onClick={() => handleSearch(searchInput)}
+              disabled={loading}
+              style={{ padding: '10px 15px', border: '1px solid #ccc', borderLeft: 'none' }}
+            >
               {loading ? '...' : '검색'}
             </button>
           </div>
           {error && <div style={{ color: 'red', marginBottom: '10px' }}>오류: {error}</div>}
 
-          {/* 2-2. 종목 정보 */}
+          {/* 종목 정보 */}
           <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
             {stockInfo ? (
               <>
@@ -234,13 +228,18 @@ function MarketPage() {
                     {isFavorite ? <Star sx={{ color: '#fbc02d' }} /> : <StarBorder />}
                   </IconButton>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 1,
+                  mt: 1,
+                  flexWrap: 'wrap'
+                }}>
                   <Typography variant="h4" sx={{ color: getColor(stockInfo.change) }}>
-                    {/* KRW 가격 표시 */}
                     {formatNumber(stockInfo.price_krw, 'krw')}
                   </Typography>
 
-                  {/* [신규] 국내 주식(.KS)이 아닐 때만 USD 가격 표시 */}
                   {!stockInfo.is_krw_stock && (
                     <Typography variant="h6" color="textSecondary">
                       ({formatNumber(stockInfo.price_usd, 'usd')})
@@ -260,11 +259,15 @@ function MarketPage() {
             )}
           </Box>
 
-          {/* 2-3. 즐겨찾기 목록 */}
+          {/* 즐겨찾기 */}
           <FavoritesList
             onFavoriteClick={handleFavoriteClick}
             refreshTrigger={refreshFavsTrigger}
           />
+
+          {/* 뉴스 */}
+          <NewsList symbol={activeSymbol} />
+
         </Grid>
 
       </Grid>
