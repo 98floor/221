@@ -232,7 +232,7 @@ function OrderForm({ symbol, stockInfo }) {
           onChange={(e) => handleAmountChange(e.target.value)}
           fullWidth
           sx={{ mb: 2 }}
-          helperText="최소 주문 금액: 10,000 KRW"
+          helperText="최소 주문 금액: 10,000 KRW (수수료 0.25%)"
         />
       </Box>
 

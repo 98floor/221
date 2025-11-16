@@ -3,6 +3,8 @@ import * as functions from "firebase-functions/v1";
 import {db, FieldValue} from "./index";
 import axios from "axios";
 
+const TRADE_FEE_RATE = 0.0025; // 0.25% 거래 수수료
+
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
 // [UC-4] 시장가 매수/매도 (수정본: 거래 내역 기록 및 시즌 ID 추가)
@@ -49,23 +51,41 @@ export const placeMarketOrder = functions
           throw new functions.https.HttpsError("internal", "사용자 데이터를 읽을 수 없습니다.");
         }
 
-        let cost = 0;
-        let saleValue = 0;
+        let fee = 0; // 수수료 변수
 
         if (type === "buy") {
-          cost = currentPrice * quantity;
-          if (userData.virtual_asset < cost) {
+          const cost = currentPrice * quantity;
+          fee = cost * TRADE_FEE_RATE;
+          const totalDeduction = cost + fee;
+
+          if (userData.virtual_asset < totalDeduction) {
             throw new functions.https.HttpsError("failed-precondition", "가상 자산이 부족합니다.");
           }
-          transaction.update(userRef, {virtual_asset: FieldValue.increment(-cost)});
-          const newQuantity = (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + quantity;
-          transaction.set(holdingRef, {asset_code: assetCode, quantity: newQuantity}, {merge: true});
-        } else { // sell
+          transaction.update(userRef, {
+            virtual_asset: FieldValue.increment(-totalDeduction),
+          });
+          const newQuantity =
+            (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + quantity;
+          transaction.set(
+            holdingRef,
+            {asset_code: assetCode, quantity: newQuantity},
+            {merge: true}
+          );
+        } else {
+          // sell
           if (!holdingDoc.exists || holdingDoc.data()?.quantity < quantity) {
-            throw new functions.https.HttpsError("failed-precondition", "보유 수량이 부족합니다.");
+            throw new functions.https.HttpsError(
+              "failed-precondition",
+              "보유 수량이 부족합니다."
+            );
           }
-          saleValue = currentPrice * quantity;
-          transaction.update(userRef, {virtual_asset: FieldValue.increment(saleValue)});
+          const saleValue = currentPrice * quantity;
+          fee = saleValue * TRADE_FEE_RATE;
+          const totalAddition = saleValue - fee;
+
+          transaction.update(userRef, {
+            virtual_asset: FieldValue.increment(totalAddition),
+          });
           const newQuantity = holdingDoc.data()?.quantity - quantity;
           if (newQuantity > 0) {
             transaction.update(holdingRef, {quantity: newQuantity});
@@ -82,6 +102,7 @@ export const placeMarketOrder = functions
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
           seasonId: currentSeasonId, // 시즌 ID 추가
+          fee: fee, // 수수료 기록
         };
 
         const txRef = userRef.collection("transactions").doc();

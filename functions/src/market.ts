@@ -7,6 +7,8 @@ import axios from "axios"; // market 함수들이 사용하는 import
 // index.ts에 있는 db, FieldValue를 가져옵니다. (중요)
 import {db, FieldValue} from "./index";
 
+const TRADE_FEE_RATE = 0.0025; // 0.25% 거래 수수료
+
 // 이 함수들이 사용하는 상수
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -132,11 +134,20 @@ export const buyAsset = functions
           throw new functions.https.HttpsError("internal", "사용자 데이터를 읽을 수 없습니다.");
         }
         const userCash = userData["virtual_asset"];
-        if (userCash < totalCost) {
-          throw new functions.https.HttpsError("failed-precondition", "보유 현금이 부족합니다.");
+
+        // --- [신규] 수수료 계산 로직 ---
+        const fee = totalCost * TRADE_FEE_RATE;
+        const totalDeduction = totalCost + fee;
+        // --- 로직 종료 ---
+
+        if (userCash < totalDeduction) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            `보유 현금이 부족합니다. (필요: ${totalDeduction.toLocaleString()} / 보유: ${userCash.toLocaleString()})`
+          );
         }
 
-        const newCash = userCash - totalCost;
+        const newCash = userCash - totalDeduction;
         const holdingRef = userRef.collection("holdings").doc(symbol);
         const holdingDoc = await transaction.get(holdingRef);
 
@@ -148,7 +159,9 @@ export const buyAsset = functions
           const oldQuantity = holdingData["quantity"];
           const oldAvgPrice = holdingData["avg_buy_price"];
           const newTotalQuantity = oldQuantity + quantityToTrade;
-          const newAvgPrice = ((oldAvgPrice * oldQuantity) + (currentPrice * quantityToTrade)) / newTotalQuantity;
+          const newAvgPrice =
+            (oldAvgPrice * oldQuantity + currentPrice * quantityToTrade) /
+            newTotalQuantity;
           transaction.update(holdingRef, {
             quantity: newTotalQuantity,
             avg_buy_price: newAvgPrice,
@@ -169,6 +182,7 @@ export const buyAsset = functions
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
           seasonId: currentSeasonId, // 시즌 ID 추가
+          fee: fee, // 수수료 기록
         };
 
         const txRef = userRef.collection("transactions").doc();
@@ -265,7 +279,12 @@ export const sellAsset = functions
         }
         const heldQuantity = holdingData["quantity"];
         if (heldQuantity < quantityToTrade) {
-          throw new functions.https.HttpsError("failed-precondition", `보유 수량이 부족합니다. (보유: ${heldQuantity.toFixed(4)} / 요청: ${quantityToTrade.toFixed(4)})`);
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            `보유 수량이 부족합니다. (보유: ${heldQuantity.toFixed(
+              4
+            )} / 요청: ${quantityToTrade.toFixed(4)})`
+          );
         }
 
         const newHeldQuantity = heldQuantity - quantityToTrade;
@@ -275,6 +294,11 @@ export const sellAsset = functions
           transaction.update(holdingRef, {quantity: newHeldQuantity});
         }
 
+        // --- [신규] 수수료 계산 로직 ---
+        const fee = totalSaleValue * TRADE_FEE_RATE;
+        const totalAddition = totalSaleValue - fee;
+        // --- 로직 종료 ---
+
         // --- [수정됨] 거래 내역에 seasonId 추가 ---
         const transactionData = {
           type: "sell",
@@ -283,6 +307,7 @@ export const sellAsset = functions
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
           seasonId: currentSeasonId, // 시즌 ID 추가
+          fee: fee, // 수수료 기록
         };
 
         const txRef = userRef.collection("transactions").doc();
@@ -292,7 +317,7 @@ export const sellAsset = functions
         // --- 수정 끝 ---
 
         const userCash = userData["virtual_asset"];
-        const newCash = userCash + totalSaleValue;
+        const newCash = userCash + totalAddition;
         transaction.update(userRef, {virtual_asset: newCash});
       });
 

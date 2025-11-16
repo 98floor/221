@@ -166,7 +166,7 @@ export const endSeason = functions
 
       // 문서가 없거나 필드가 유효하지 않으면 새로 생성
       if (!seasonDoc.exists || !seasonDoc.data()?.seasonId) {
-        await seasonRef.set({ seasonId: currentSeasonId, startDate: new Date() });
+        await seasonRef.set({seasonId: currentSeasonId, startDate: new Date()});
       }
 
       const newSeasonId = currentSeasonId + 1;
@@ -349,13 +349,13 @@ export const deleteSeason = functions
       // --- 3. 현재 시즌 ID 업데이트 ---
       console.log("현재 시즌 ID 업데이트 중...");
       const newCurrentSeasonId = currentSeasonId - 1;
-      await seasonRef.update({ seasonId: newCurrentSeasonId });
+      await seasonRef.update({seasonId: newCurrentSeasonId});
 
       // [추가] 모든 과거 시즌이 삭제되었는지 확인 후, 필요시 ID를 1로 초기화
       const allHoFSnapshot = await db.collection("hall_of_fame").get();
       if (allHoFSnapshot.empty) {
         console.log("모든 과거 시즌이 삭제되어, 시즌 ID를 1로 초기화합니다.");
-        await seasonRef.set({ seasonId: 1 });
+        await seasonRef.set({seasonId: 1});
       }
 
       console.log(`시즌 ${seasonIdToDelete} 삭제 및 재정렬 작업 완료.`);
