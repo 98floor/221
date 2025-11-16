@@ -1,8 +1,9 @@
 // client/src/pages/PortfolioPage.js
 import React, { useState, useEffect } from 'react';
-import { functions, db, auth } from '../firebase'; // [수정됨] db, auth 임포트
-import { httpsCallable } from 'firebase/functions'; // httpsCallable 임포트
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'; // [신규] Firestore 쿼리 도구
+import { functions, db, auth } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import PortfolioChart from '../components/PortfolioChart'; // [신규] 차트 컴포넌트 임포트
 
 // [신규] 헬퍼 함수: Firestore Timestamp 객체를 날짜 문자열로 변환
 const formatDate = (timestamp) => {
@@ -26,14 +27,18 @@ const formatNumber = (num, type = 'krw') => {
 };
 
 function PortfolioPage() {
-  const [portfolio, setPortfolio] = useState(null); // 포트폴리오 데이터
+  const [portfolio, setPortfolio] = useState(null);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [errorPortfolio, setErrorPortfolio] = useState(null);
 
-  // [신규] 전체 거래 내역 state
   const [transactions, setTransactions] = useState([]);
   const [loadingTx, setLoadingTx] = useState(true);
   const [errorTx, setErrorTx] = useState(null);
+
+  // [신규] 차트 데이터 state
+  const [historyData, setHistoryData] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [errorHistory, setErrorHistory] = useState(null);
 
   useEffect(() => {
     // 1. 포트폴리오(보유 자산) 조회
@@ -41,7 +46,7 @@ function PortfolioPage() {
       try {
         const getPortfolio = httpsCallable(functions, 'getPortfolio');
         const result = await getPortfolio();
-        setPortfolio(result.data); 
+        setPortfolio(result.data);
       } catch (err) {
         console.error("포트폴리오 조회 실패:", err);
         setErrorPortfolio(err.message);
@@ -50,13 +55,31 @@ function PortfolioPage() {
       }
     };
 
-    fetchPortfolio();
+    // [신규] 2. 자산 변동 내역 조회
+    const fetchHistory = async () => {
+      try {
+        const getPortfolioHistory = httpsCallable(functions, 'getPortfolioHistory');
+        const result = await getPortfolioHistory();
+        if (result.data.success) {
+          setHistoryData(result.data.history);
+        } else {
+          throw new Error("History data fetching failed.");
+        }
+      } catch (err) {
+        console.error("자산 변동 내역 조회 실패:", err);
+        setErrorHistory(err.message);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
 
-    // 2. [신규] 전체 거래 내역 (all_time_transactions) 실시간 조회
+    fetchPortfolio();
+    fetchHistory();
+
+    // 3. 전체 거래 내역 (all_time_transactions) 실시간 조회
     const unsubscribe = auth.onAuthStateChanged(user => {
       if (user) {
         setLoadingTx(true);
-        // [신규] 영구 보존되는 'all_time_transactions' 컬렉션을 쿼리
         const txCollectionRef = collection(db, "users", user.uid, "all_time_transactions");
         const q = query(txCollectionRef, orderBy("trade_dt", "desc"));
 
@@ -73,32 +96,36 @@ function PortfolioPage() {
           setLoadingTx(false);
         });
         
-        return () => unsubscribeSnapshot(); // 하위 리스너 정리
+        return () => unsubscribeSnapshot();
       } else {
-        // 로그아웃 상태
         setLoadingTx(false);
         setTransactions([]);
       }
     });
 
-    return () => unsubscribe(); // auth 리스너 정리
+    return () => unsubscribe();
 
-  }, []); // []는 페이지가 처음 렌더링될 때 한 번만 실행
+  }, []);
 
   // 로딩 중일 때
-  if (loadingPortfolio) {
+  if (loadingPortfolio || loadingHistory) {
     return <div>포트폴리오를 불러오는 중...</div>;
   }
 
   // 에러 발생 시
-  if (errorPortfolio) {
-    return <div>오류: {errorPortfolio} (로그인이 필요할 수 있습니다.)</div>;
+  if (errorPortfolio || errorHistory) {
+    return <div>오류: {errorPortfolio || errorHistory} (로그인이 필요할 수 있습니다.)</div>;
   }
 
-  // 성공적으로 데이터를 가져왔을 때
   return (
     <div>
       <h2>내 포트폴리오 (UC-6)</h2>
+
+      {/* --- [신규] 자산 변동 그래프 --- */}
+      <h3>자산 변동 그래프</h3>
+      <PortfolioChart data={historyData} />
+      <hr style={{marginTop: '40px'}} />
+      {/* --- 그래프 끝 --- */}
 
       {portfolio ? (
         <div>
@@ -144,7 +171,7 @@ function PortfolioPage() {
                 {portfolio.holdings.map((stock) => (
                   <tr key={stock.symbol}>
                     <td>{stock.symbol}</td>
-                    <td>{formatNumber(stock.quantity, 'qty')}</td> {/* [수정됨] formatNumber 사용 */}
+                    <td>{formatNumber(stock.quantity, 'qty')}</td>
                     <td>{formatNumber(stock.avg_buy_price)}</td>
                     <td>{formatNumber(stock.current_price)}</td>
                     <td>{formatNumber(stock.current_value)}</td>
@@ -166,7 +193,6 @@ function PortfolioPage() {
         <p>데이터를 불러오지 못했습니다.</p>
       )}
 
-      {/* --- [신규] 전체 거래 내역 섹션 --- */}
       <hr style={{marginTop: '40px'}} />
       <h3>전체 거래 내역 (영구 보관)</h3>
       {loadingTx && <p>전체 거래 내역을 불러오는 중...</p>}
@@ -204,8 +230,6 @@ function PortfolioPage() {
           </table>
         </div>
       )}
-      {/* --- [신규] 섹션 끝 --- */}
-
     </div>
   );
 }

@@ -33,3 +33,4 @@ export * from "./debate";
 export * from "./orders";
 export * from "./favorites";
 export * from "./news";
+export * from "./history";
