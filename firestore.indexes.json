@@ -2,48 +2,40 @@
   "indexes": [
     {
       "collectionGroup": "transactions",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {
-          "fieldPath": "userId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "stockId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "DESCENDING"
-        }
+        { "fieldPath": "seasonId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "portfolio_history",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "seasonId", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "transactions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {
-          "fieldPath": "asset_code",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "trade_dt",
-          "order": "DESCENDING"
-        }
+        { "fieldPath": "seasonId", "order": "ASCENDING" },
+        { "fieldPath": "trade_dt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "portfolio_history",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {
-          "fieldPath": "seasonId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "date",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "seasonId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "asset_code", "order": "ASCENDING" },
+        { "fieldPath": "trade_dt", "order": "DESCENDING" }
       ]
     }
   ],

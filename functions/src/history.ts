@@ -29,6 +29,12 @@ export const recordPortfolioHistory = functions
     }
 
     try {
+      // --- 현재 시즌 ID 가져오기 ---
+      const seasonRef = db.collection("seasons").doc("current");
+      const seasonDoc = await seasonRef.get();
+      const currentSeasonId = seasonDoc.exists ? seasonDoc.data()?.seasonId : 1;
+      // --- 시즌 ID 가져오기 끝 ---
+
       const userCash = afterData.virtual_asset;
       const holdingsSnapshot = await db
         .collection("users")
@@ -76,7 +82,7 @@ export const recordPortfolioHistory = functions
         date: FieldValue.serverTimestamp(),
         totalAsset: totalAsset,
         profitRate: profitRate,
-        seasonId: "current_season", // 시즌 ID 추가
+        seasonId: currentSeasonId, // [수정됨] 실제 시즌 ID 사용
       });
 
       console.log(`Successfully recorded portfolio history for user ${userId}`);
@@ -97,35 +103,89 @@ export const getPortfolioHistory = functions
       throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
     }
     const uid = context.auth.uid;
+    const {seasonId} = data;
+
+    // [수정됨] seasonId가 유효한 숫자인지 확인
+    if (typeof seasonId !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "A valid seasonId number must be provided.");
+    }
 
     try {
       const historySnapshot = await db
         .collection("users")
         .doc(uid)
         .collection("portfolio_history")
-        .where("seasonId", "==", "current_season") // 현재 시즌 데이터만 조회
+        .where("seasonId", "==", seasonId) // [수정됨] 전달받은 seasonId를 바로 사용
         .orderBy("date", "asc")
         .get();
 
+      if (historySnapshot.empty) {
+        return {success: true, history: []};
+      }
+
       const history = historySnapshot.docs.map((doc) => {
         const docData = doc.data();
-        // 데이터 유효성 검사: date 필드가 Timestamp 객체인지 확인
         if (docData.date && typeof docData.date.toDate === "function") {
           return {
-            // Firestore Timestamp를 ISO 문자열로 변환하여 클라이언트에 전달
             date: docData.date.toDate().toISOString(),
             totalAsset: docData.totalAsset,
             profitRate: docData.profitRate,
           };
         }
-        // 유효하지 않은 데이터는 로그를 남기고 null 반환
-        console.warn(`Invalid data found in portfolio_history for user ${uid}:`, doc.id, docData);
+        console.warn(`Invalid data in portfolio_history for user ${uid}:`, doc.id);
         return null;
-      }).filter(item => item !== null); // null 값 제거
+      }).filter((item) => item !== null);
 
       return {success: true, history};
     } catch (error) {
       console.error(`Error fetching portfolio history for user ${uid}:`, error);
-      throw new functions.https.HttpsError("internal", "Failed to fetch portfolio history.");
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      throw new functions.https.HttpsError("internal", `Failed to fetch portfolio history: ${errorMessage}`);
+    }
+  });
+
+/**
+ * [신규] 클라이언트에서 거래 내역을 조회하기 위한 함수
+ */
+export const getTransactionHistory = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Authentication is required.");
+    }
+    const uid = context.auth.uid;
+    const {seasonId} = data;
+
+    if (typeof seasonId !== "number") {
+      throw new functions.https.HttpsError("invalid-argument", "A valid seasonId number must be provided.");
+    }
+
+    try {
+      const transSnapshot = await db
+        .collection("users")
+        .doc(uid)
+        .collection("transactions")
+        .where("seasonId", "==", seasonId)
+        .orderBy("trade_dt", "desc")
+        .get();
+
+      if (transSnapshot.empty) {
+        return {success: true, transactions: []};
+      }
+
+      const transactions = transSnapshot.docs.map((doc) => {
+        const docData = doc.data();
+        return {
+          id: doc.id,
+          ...docData,
+          trade_dt: docData.trade_dt.toDate().toISOString(),
+        };
+      });
+
+      return {success: true, transactions};
+    } catch (error) {
+      console.error(`Error fetching transaction history for user ${uid}:`, error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      throw new functions.https.HttpsError("internal", `Failed to fetch transaction history: ${errorMessage}`);
     }
   });

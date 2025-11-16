@@ -130,49 +130,70 @@ export const toggleUserSuspension = functions
   });
 
 
-// [UC-15] 시즌 마감 (관리자 기능) (최종 수정본: 환율 적용 + 보유 종목 초기화 + 랭킹 초기화 + Null 검사)
+// [UC-15] 시즌 마감 (관리자 기능) (수정본: 시즌 관리 기능 추가)
 export const endSeason = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
-
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "관리자 권한이 필요합니다.");
     }
 
-    console.log("시즌 마감(UC-15) 로직 실행 시작...");
+    // 1. 관리자 여부 확인
+    const callerRef = db.collection("users").doc(context.auth.uid);
+    const callerDoc = await callerRef.get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "시즌을 마감할 관리자 권한이 없습니다.");
+    }
+
+    console.log("시즌 마감 로직 실행 시작...");
 
     const initialCapital = 10000000;
+    const seasonRef = db.collection("seasons").doc("current");
 
     try {
-      // --- 1. 모든 사용자의 최종 랭킹 집계 및 자산 초기화 (동시 진행) ---
-      const usersSnapshot = await db.collection("users").get();
+      // --- 1. 현재 시즌 정보 가져오기 ---
+      const seasonDoc = await seasonRef.get();
+      let currentSeasonId = 1;
+      if (seasonDoc.exists) {
+        const data = seasonDoc.data();
+        if (data && data.seasonId) {
+          currentSeasonId = data.seasonId;
+        }
+      }
 
-      const endSeasonPromises = usersSnapshot.docs.map(async (userDoc) => {
+      // 문서가 없거나 필드가 유효하지 않으면 새로 생성
+      if (!seasonDoc.exists || !seasonDoc.data()?.seasonId) {
+        await seasonRef.set({ seasonId: currentSeasonId, startDate: new Date() });
+      }
+
+      const newSeasonId = currentSeasonId + 1;
+
+      // --- 2. 모든 사용자의 최종 랭킹 집계 및 자산 초기화 ---
+      const usersSnapshot = await db.collection("users").get();
+      const rankingData = [];
+
+      for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data();
-        if (!userData) return null; // null 반환
+        if (!userData) continue;
 
         const uid = userDoc.id;
-        const userCash = userData["virtual_asset"];
+        const userCash = userData.virtual_asset;
 
-        // (A) 최종 랭킹 계산 (환율 적용)
+        // (A) 최종 자산 가치 계산
         const holdingsRef = userDoc.ref.collection("holdings");
         const holdingsSnapshot = await holdingsRef.get();
         let totalAssetValue = 0;
 
         if (!holdingsSnapshot.empty) {
-          const holdingPromises = holdingsSnapshot.docs.map(async (holdingDoc) => {
+          for (const holdingDoc of holdingsSnapshot.docs) {
             const holdingData = holdingDoc.data();
-            if (!holdingData) return;
-            const symbol = holdingData["asset_code"];
-            const quantity = holdingData["quantity"];
+            const symbol = holdingData.asset_code;
+            const quantity = holdingData.quantity;
             try {
-              const apiResponse = await axios.get(
-                `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-              );
+              const apiResponse = await axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
               let currentPrice = apiResponse.data.c;
               if (!symbol.toUpperCase().endsWith(".KS")) {
                 currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
@@ -181,78 +202,167 @@ export const endSeason = functions
                 totalAssetValue += currentPrice * quantity;
               }
             } catch (apiError) {
-              // (API 오류는 무시)
+              console.error(`API 오류 (사용자: ${uid}, 종목: ${symbol}):`, apiError);
             }
-          });
-          await Promise.all(holdingPromises);
+          }
         }
         const totalPortfolioValue = userCash + totalAssetValue;
         const profitRate = ((totalPortfolioValue - initialCapital) / initialCapital) * 100;
 
-        // (B) 자산 초기화 (holdings, transactions) ...
+        rankingData.push({
+          uid: uid,
+          nickname: userData.nickname,
+          profit_rate: profitRate,
+        });
+
+        // (B) 데이터 보존 및 초기화
         const batch = db.batch();
 
-        // [신규] 시즌 거래내역(transactions) 컬렉션 스냅샷 가져오기
-        const transactionsRef = userDoc.ref.collection("transactions");
-        const transactionsSnapshot = await transactionsRef.get();
+        // 사용자 거래내역(transactions)에 seasonId 추가
+        const transRef = userDoc.ref.collection("transactions");
+        const transSnapshot = await transRef.where("seasonId", "==", null).get(); // 시즌 ID가 없는 것만
+        transSnapshot.forEach((doc) => {
+          batch.update(doc.ref, {seasonId: currentSeasonId});
+        });
 
-        // 1. holdings 삭제
+        // 사용자 포트폴리오 기록(portfolio_history)에 seasonId 추가
+        const portfolioRef = userDoc.ref.collection("portfolio_history");
+        const portfolioSnapshot = await portfolioRef.where("seasonId", "==", null).get();
+        portfolioSnapshot.forEach((doc) => {
+          batch.update(doc.ref, {seasonId: currentSeasonId});
+        });
+
+        // 보유 주식(holdings) 삭제
         holdingsSnapshot.forEach((doc) => {
           batch.delete(doc.ref);
         });
 
-        // 2. [신규] transactions 삭제 (all_time_transactions는 보존)
-        transactionsSnapshot.forEach((doc) => {
-          batch.delete(doc.ref);
-        });
-
-        // 3. 유저 자산/퀴즈 상태 초기화
+        // 유저 자산 및 퀴즈 상태 초기화
         batch.update(userDoc.ref, {
           virtual_asset: initialCapital,
           quiz_try_cnt: 0,
         });
 
-        // 4. 배치 실행
         await batch.commit();
+      }
 
-        // (C) 랭킹 데이터 반환
-        return {
-          uid: uid,
-          nickname: userData["nickname"],
-          profit_rate: profitRate,
-        };
-      });
+      // --- 3. 명예의 전당(hall_of_fame)에 저장 ---
+      rankingData.sort((a, b) => b.profit_rate - a.profit_rate);
+      const topRankers = rankingData.slice(0, 10);
 
-      // --- 2. 명예의 전당(hall_of_fame)에 저장 ---
-      const rankingData = (await Promise.all(endSeasonPromises));
-
-      // 랭킹 정렬 (Null 안전 코드)
-      rankingData.sort((a, b) => {
-        if (!a) return 1;
-        if (!b) return -1;
-        return b.profit_rate - a.profit_rate;
-      });
-
-      const topRankers = rankingData.filter(Boolean).slice(0, 10);
-
-      const seasonId = `season_${new Date().getTime()}`;
-      const hallOfFameRef = db.collection("hall_of_fame").doc(seasonId);
+      const hallOfFameRef = db.collection("hall_of_fame").doc(`season_${currentSeasonId}`);
       await hallOfFameRef.set({
-        season_name: `시즌 (마감: ${new Date().toLocaleDateString("ko-KR")})`,
+        season_name: `시즌 ${currentSeasonId} (마감: ${new Date().toLocaleDateString("ko-KR")})`,
         top_rankers: topRankers,
+        endDate: new Date(),
       });
 
-      // --- 3. 랭킹 페이지 초기화 ---
-      const rankingRef = db.collection("ranking").doc("current_season");
-      await rankingRef.delete();
+      // --- 4. 새 시즌 시작 ---
+      await seasonRef.update({
+        seasonId: newSeasonId,
+        startDate: new Date(),
+      });
 
-      console.log("시즌 마감(UC-15) 성공적으로 완료.");
-      return {success: true, message: `시즌이 마감되었습니다. (ID: ${seasonId})`};
+      console.log(`시즌 ${currentSeasonId} 마감 완료. 새 시즌 ${newSeasonId} 시작.`);
+      return {success: true, message: `시즌 ${currentSeasonId}이(가) 마감되었습니다.`};
     } catch (error) {
-      console.error("시즌 마감(UC-15) 오류:", error);
+      console.error("시즌 마감 처리 오류:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
       throw new functions.https.HttpsError("internal", "시즌 마감 처리에 실패했습니다.");
+    }
+  });
+
+// [복원] 시즌 삭제 함수
+export const deleteSeason = functions
+  .runWith({timeoutSeconds: 540, memory: "1GB"})
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "관리자 권한이 필요합니다.");
+    }
+    const callerRef = db.collection("users").doc(context.auth.uid);
+    const callerDoc = await callerRef.get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "시즌을 삭제할 관리자 권한이 없습니다.");
+    }
+
+    const {seasonIdToDelete} = data;
+    if (typeof seasonIdToDelete !== "number" || seasonIdToDelete <= 0) {
+      throw new functions.https.HttpsError("invalid-argument", "유효한 시즌 ID를 입력해야 합니다.");
+    }
+
+    console.log(`[v3] 시즌 ${seasonIdToDelete} 삭제 및 재정렬 작업 시작...`);
+
+    try {
+      const seasonRef = db.collection("seasons").doc("current");
+      const currentSeasonDoc = await seasonRef.get();
+      const currentSeasonId = currentSeasonDoc.exists ? currentSeasonDoc.data()?.seasonId : 1;
+
+      if (seasonIdToDelete >= currentSeasonId) {
+        throw new functions.https.HttpsError("failed-precondition", "현재 진행 중이거나 미래의 시즌은 삭제할 수 없습니다.");
+      }
+
+      const usersSnapshot = await db.collection("users").get();
+      const collectionsToProcess = ["transactions", "portfolio_history"];
+
+      // --- 1. 삭제할 시즌 데이터 정리 ---
+      console.log(`명예의 전당 season_${seasonIdToDelete} 문서 삭제 중...`);
+      await db.collection("hall_of_fame").doc(`season_${seasonIdToDelete}`).delete();
+
+      for (const userDoc of usersSnapshot.docs) {
+        for (const collectionName of collectionsToProcess) {
+          const snapshot = await userDoc.ref.collection(collectionName).where("seasonId", "==", seasonIdToDelete).get();
+          for (const doc of snapshot.docs) {
+            await doc.ref.delete();
+          }
+        }
+      }
+
+      // --- 2. 후속 시즌들 재정렬 ---
+      for (let oldSeasonId = seasonIdToDelete + 1; oldSeasonId < currentSeasonId; oldSeasonId++) {
+        const newSeasonId = oldSeasonId - 1;
+        console.log(`시즌 ${oldSeasonId} -> 시즌 ${newSeasonId} 재정렬 중...`);
+
+        const oldHoFDocRef = db.collection("hall_of_fame").doc(`season_${oldSeasonId}`);
+        const oldHoFDoc = await oldHoFDocRef.get();
+        if (oldHoFDoc.exists) {
+          const hofData = oldHoFDoc.data();
+          if (hofData) {
+            hofData.season_name = `시즌 ${newSeasonId} (마감: ${hofData.endDate.toDate().toLocaleDateString("ko-KR")})`;
+            await db.collection("hall_of_fame").doc(`season_${newSeasonId}`).set(hofData);
+            await oldHoFDocRef.delete();
+          }
+        }
+
+        for (const userDoc of usersSnapshot.docs) {
+          for (const collectionName of collectionsToProcess) {
+            const snapshot = await userDoc.ref.collection(collectionName).where("seasonId", "==", oldSeasonId).get();
+            for (const doc of snapshot.docs) {
+              await doc.ref.update({seasonId: newSeasonId});
+            }
+          }
+        }
+      }
+
+      // --- 3. 현재 시즌 ID 업데이트 ---
+      console.log("현재 시즌 ID 업데이트 중...");
+      const newCurrentSeasonId = currentSeasonId - 1;
+      await seasonRef.update({ seasonId: newCurrentSeasonId });
+
+      // [추가] 모든 과거 시즌이 삭제되었는지 확인 후, 필요시 ID를 1로 초기화
+      const allHoFSnapshot = await db.collection("hall_of_fame").get();
+      if (allHoFSnapshot.empty) {
+        console.log("모든 과거 시즌이 삭제되어, 시즌 ID를 1로 초기화합니다.");
+        await seasonRef.set({ seasonId: 1 });
+      }
+
+      console.log(`시즌 ${seasonIdToDelete} 삭제 및 재정렬 작업 완료.`);
+      return {success: true, message: `시즌 ${seasonIdToDelete}이(가) 성공적으로 삭제 및 재정렬되었습니다.`};
+    } catch (error) {
+      console.error(`시즌 ${seasonIdToDelete} 삭제 오류:`, error);
+      if (error instanceof functions.https.HttpsError) throw error;
+      throw new functions.https.HttpsError("internal", "시즌 삭제 작업에 실패했습니다.");
     }
   });

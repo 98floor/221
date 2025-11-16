@@ -1,45 +1,45 @@
 // client/src/pages/HallOfFamePage.js
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase'; //  db 임포트
-import { collection, getDocs } from 'firebase/firestore'; //  컬렉션 읽기 도구 임포트
+import { db } from '../firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'; // onSnapshot 추가
 
 function HallOfFamePage() {
   const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 헬퍼 함수
   const formatNumber = (num, type = 'percent') => {
+    if (typeof num !== 'number') return 'N/A';
     return `${num.toFixed(2)}%`;
   };
 
   useEffect(() => {
-    const fetchHallOfFame = async () => {
-      try {
-        // 1. 'hall_of_fame' 컬렉션의 모든 문서를 조회 [cite: 222]
-        const querySnapshot = await getDocs(collection(db, 'hall_of_fame'));
+    setLoading(true);
+    
+    // [수정] 'endDate' 필드를 기준으로 내림차순 정렬하여 최신 시즌이 위로 오게 함
+    const q = query(collection(db, 'hall_of_fame'), orderBy('endDate', 'desc'));
 
-        const seasonsData = [];
-        querySnapshot.forEach((doc) => {
-          // 2. 각 시즌(문서)의 데이터를 배열에 추가
-          seasonsData.push({
-            id: doc.id,
-            ...doc.data()
-          });
+    // [수정] onSnapshot을 사용하여 실시간으로 데이터 변경을 감지
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const seasonsData = [];
+      querySnapshot.forEach((doc) => {
+        seasonsData.push({
+          id: doc.id,
+          ...doc.data()
         });
+      });
+      setSeasons(seasonsData);
+      setLoading(false);
+    }, (err) => {
+      // 에러 처리
+      console.error("명예의 전당 실시간 조회 실패:", err);
+      setError(err.message);
+      setLoading(false);
+    });
 
-        setSeasons(seasonsData);
-
-      } catch (err) {
-        console.error("명예의 전당 조회 실패:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHallOfFame();
-  }, []);
+    // 컴포넌트가 언마운트될 때 실시간 리스너를 정리
+    return () => unsubscribe();
+  }, []); // 의존성 배열은 비워두어 컴포넌트 마운트 시 한 번만 실행되도록 함
 
   if (loading) {
     return <div>데이터를 불러오는 중...</div>;
@@ -51,13 +51,13 @@ function HallOfFamePage() {
 
   return (
     <div>
-      <h2>명예의 전당 (UC-8)</h2>
+      <h2>명예의 전당</h2>
 
       {seasons.length > 0 ? (
         seasons.map((season) => (
           <div key={season.id} style={{ marginBottom: 30 }}>
-            <h3>{season.season_name} (시즌 ID: {season.id})</h3>
-            <table border="1" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <h3>{season.season_name}</h3>
+            <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
               <thead>
                 <tr>
                   <th>순위</th>
@@ -66,8 +66,8 @@ function HallOfFamePage() {
                 </tr>
               </thead>
               <tbody>
-                {season.top_rankers.map((ranker, index) => (
-                  <tr key={ranker.uid}>
+                {season.top_rankers && season.top_rankers.map((ranker, index) => (
+                  <tr key={ranker.uid || index}>
                     <td>{index + 1}</td>
                     <td>{ranker.nickname}</td>
                     <td style={{ color: ranker.profit_rate >= 0 ? 'green' : 'red' }}>

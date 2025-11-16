@@ -34,6 +34,7 @@ function AdminPage() {
   const [setAdminMessage, setSetAdminMessage] = useState('');
 
   const [loadingSeason, setLoadingSeason] = useState(false);
+  const [pastSeasons, setPastSeasons] = useState([]); // [신규] 과거 시즌 목록 state
 
   // --- Data Fetching ---
   const fetchAllAdminData = useCallback(async () => {
@@ -43,21 +44,29 @@ function AdminPage() {
     setLoadingPosts(true);
     setLoadingQuizzes(true);
     setLoadingDebates(true);
+    setLoadingSeason(true); // 시즌 로딩 시작
 
     try {
       const usersResultPromise = httpsCallable(functions, 'listAllUsers')();
       const postsSnapshotPromise = getDocs(query(collection(db, 'posts'), orderBy('created_at', 'desc')));
       const quizzesSnapshotPromise = getDocs(query(collection(db, 'quizzes'), orderBy('createdAt', 'desc')));
       const debatesSnapshotPromise = getDocs(query(collection(db, 'debates'), orderBy('createdAt', 'desc')));
+      const seasonsSnapshotPromise = getDocs(query(collection(db, 'hall_of_fame'), orderBy('endDate', 'desc'))); // [신규] 시즌 목록 조회
       
-      const [usersResult, postsSnapshot, quizzesSnapshot, debatesSnapshot] = await Promise.all([
-        usersResultPromise, postsSnapshotPromise, quizzesSnapshotPromise, debatesSnapshotPromise
+      const [usersResult, postsSnapshot, quizzesSnapshot, debatesSnapshot, seasonsSnapshot] = await Promise.all([
+        usersResultPromise, postsSnapshotPromise, quizzesSnapshotPromise, debatesSnapshotPromise, seasonsSnapshotPromise
       ]);
 
       if (usersResult.data.success) setUsers(usersResult.data.users);
       setPosts(postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setQuizzes(quizzesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setDebates(debatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      
+      // [신규] 시즌 목록 state 업데이트
+      setPastSeasons(seasonsSnapshot.docs.map(doc => {
+        const seasonId = parseInt(doc.id.split('_')[1]);
+        return { id: seasonId, name: doc.data().season_name };
+      }));
 
     } catch (err) {
       setMessage(`데이터 로딩 중 오류 발생: ${err.message}`);
@@ -66,6 +75,7 @@ function AdminPage() {
       setLoadingPosts(false);
       setLoadingQuizzes(false);
       setLoadingDebates(false);
+      setLoadingSeason(false); // 시즌 로딩 종료
     }
   }, [role]);
 
@@ -82,7 +92,7 @@ function AdminPage() {
       setPostMessage('게시물이 삭제되었습니다.');
       fetchAllAdminData();
     } catch (err) {
-      setPostMessage(`삭제 실패: ${err.message}`);
+      setPostMessage(` 삭제 실패: ${err.message}`);
     }
   };
 
@@ -120,7 +130,7 @@ function AdminPage() {
       setQuizMessage('퀴즈가 삭제되었습니다.');
       fetchAllAdminData();
     } catch (err) {
-      setQuizMessage(`삭제 실패: ${err.message}`);
+      setQuizMessage(` 삭제 실패: ${err.message}`);
     }
   };
 
@@ -162,7 +172,7 @@ function AdminPage() {
       setDebateMessage('토론 주제가 삭제되었습니다.');
       fetchAllAdminData();
     } catch (err) {
-      setDebateMessage(`삭제 실패: ${err.message}`);
+      setDebateMessage(` 삭제 실패: ${err.message}`);
     }
   };
   
@@ -183,11 +193,30 @@ function AdminPage() {
   const handleEndSeason = async () => {
     if (!window.confirm('정말로 이번 시즌을 마감하시겠습니까?\n모든 사용자의 자산이 초기화되며, 되돌릴 수 없습니다.')) return;
     setLoadingSeason(true);
+    setMessage('');
     try {
       const result = await httpsCallable(functions, 'endSeason')();
       setMessage(result.data.message);
+      fetchAllAdminData(); // 시즌 마감 후 데이터 새로고침
     } catch (err) {
       setMessage(`시즌 마감 실패: ${err.message}`);
+    } finally {
+      setLoadingSeason(false);
+    }
+  };
+
+  // [복원] 시즌 삭제 핸들러
+  const handleDeleteSeason = async (seasonId) => {
+    if (!window.confirm(`[경고] 시즌 ${seasonId}을(를) 정말로 삭제하시겠습니까?\n\n이 작업은 해당 시즌의 모든 기록(명예의 전당, 거래 내역, 자산 변동)을 영구적으로 삭제하며, 이후 시즌들의 번호를 재정렬합니다.\n\n절대로 되돌릴 수 없습니다!`)) return;
+    setLoadingSeason(true);
+    setMessage('');
+    try {
+      console.log(`[시즌 삭제] 함수 호출. 전달하는 seasonId: ${seasonId} (타입: ${typeof seasonId})`); // 디버깅 로그
+      const result = await httpsCallable(functions, 'deleteSeason')({ seasonIdToDelete: seasonId });
+      setMessage(result.data.message);
+      fetchAllAdminData(); // 삭제 후 데이터 새로고침
+    } catch (err) {
+      setMessage(`시즌 삭제 실패: ${err.message}`);
     } finally {
       setLoadingSeason(false);
     }
@@ -202,11 +231,13 @@ function AdminPage() {
       <button onClick={fetchAllAdminData}>전체 데이터 새로고침</button>
       {message && <p style={{color: 'blue', fontWeight: 'bold'}}>{message}</p>}
 
+      {/* ... (다른 관리 섹션들은 기존과 동일) ... */}
       <div style={{ border: '1px solid #ccc', padding: '16px', margin: '20px 0' }}>
         <h3>게시물 관리</h3>
         {postMessage && <p>{postMessage}</p>}
         {loadingPosts ? <p>게시물 로딩 중...</p> : (
-          <ul>{posts.map(p => (<li key={p.id}>"{p.title}" <button onClick={() => handleDeletePost(p.id)}>삭제</button></li>))}</ul>
+          <ul>{posts.map(p => (<li key={p.id}>"{p.title}" <button onClick={() => handleDeletePost(p.id)}>삭제</button></li>))}
+          </ul>
         )}
       </div>
 
@@ -246,7 +277,8 @@ function AdminPage() {
           <button type="submit">퀴즈 생성</button>
         </form>
         {loadingQuizzes ? <p>퀴즈 로딩 중...</p> : (
-          <ul>{quizzes.map(q => (<li key={q.id}>"{q.question}" <button onClick={() => handleDeleteQuiz(q.id)}>삭제</button></li>))}</ul>
+          <ul>{quizzes.map(q => (<li key={q.id}>"{q.question}" <button onClick={() => handleDeleteQuiz(q.id)}>삭제</button></li>))}
+          </ul>
         )}
       </div>
 
@@ -269,7 +301,8 @@ function AdminPage() {
               )}
               <button onClick={() => handleDeleteDebate(d.id)} style={{ marginLeft: '10px' }}>삭제</button>
             </li>
-          ))}</ul>
+          ))}
+          </ul>
         )}
       </div>
 
@@ -282,10 +315,28 @@ function AdminPage() {
 
       <div style={{ border: '2px solid red', padding: '16px', margin: '20px 0' }}>
         <h3>시즌 관리</h3>
-        <p>[주의!] 이 버튼을 누르면 시즌이 마감되고 모든 사용자 자산이 초기화됩니다.</p>
-        <button onClick={handleEndSeason} disabled={loadingSeason} style={{ backgroundColor: 'red', color: 'white' }}>
-          {loadingSeason ? '마감 처리 중...' : '시즌 마감 실행'}
+        <p>[주의!] 아래 작업들은 되돌릴 수 없으며, 데이터 양에 따라 시간이 오래 걸릴 수 있습니다.</p>
+        <button onClick={handleEndSeason} disabled={loadingSeason} style={{ backgroundColor: 'orange', color: 'white' }}>
+          {loadingSeason ? '처리 중...' : '시즌 마감 실행'}
         </button>
+        <hr style={{ margin: '20px 0' }} />
+        <h4>과거 시즌 삭제</h4>
+        {loadingSeason ? <p>시즌 목록 로딩 중...</p> : (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {pastSeasons.map(season => (
+              <li key={season.id} style={{ marginBottom: '10px' }}>
+                <span>{season.name}</span>
+                <button 
+                  onClick={() => handleDeleteSeason(season.id)} 
+                  disabled={loadingSeason}
+                  style={{ marginLeft: '20px', backgroundColor: '#dc3545', color: 'white' }}
+                >
+                  {loadingSeason ? '처리 중...' : `시즌 ${season.id} 삭제`}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
