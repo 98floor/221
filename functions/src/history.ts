@@ -109,13 +109,19 @@ export const getPortfolioHistory = functions
 
       const history = historySnapshot.docs.map((doc) => {
         const docData = doc.data();
-        return {
-          // Firestore Timestamp를 ISO 문자열로 변환하여 클라이언트에 전달
-          date: docData.date.toDate().toISOString(),
-          totalAsset: docData.totalAsset,
-          profitRate: docData.profitRate,
-        };
-      });
+        // 데이터 유효성 검사: date 필드가 Timestamp 객체인지 확인
+        if (docData.date && typeof docData.date.toDate === "function") {
+          return {
+            // Firestore Timestamp를 ISO 문자열로 변환하여 클라이언트에 전달
+            date: docData.date.toDate().toISOString(),
+            totalAsset: docData.totalAsset,
+            profitRate: docData.profitRate,
+          };
+        }
+        // 유효하지 않은 데이터는 로그를 남기고 null 반환
+        console.warn(`Invalid data found in portfolio_history for user ${uid}:`, doc.id, docData);
+        return null;
+      }).filter(item => item !== null); // null 값 제거
 
       return {success: true, history};
     } catch (error) {
