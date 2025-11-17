@@ -263,3 +263,50 @@ export const calculateRankings = functions
       console.error("랭킹 집계(UC-7) 스케줄러 실행 중 오류 발생:", error);
     }
   });
+
+// [신규] 특정 시즌의 자산 요약 정보 조회
+export const getSeasonPortfolioSummary = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "인증된 사용자만 호출할 수 있습니다.");
+    }
+
+    const uid = context.auth.uid;
+    const seasonId = data.seasonId;
+
+    if (!seasonId) {
+      throw new functions.https.HttpsError("invalid-argument", "요청에 'seasonId'가 포함되어야 합니다.");
+    }
+
+    try {
+      const seasonDocRef = db.collection("hall_of_fame").doc(`season_${seasonId}`);
+      const seasonDoc = await seasonDocRef.get();
+
+      if (!seasonDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "해당 시즌의 데이터를 찾을 수 없습니다.");
+      }
+
+      const seasonData = seasonDoc.data();
+      const userRecord = seasonData?.user_records?.find((record: any) => record.uid === uid);
+
+      if (!userRecord) {
+        throw new functions.https.HttpsError("not-found", "해당 시즌에서 사용자의 기록을 찾을 수 없습니다.");
+      }
+
+      // `getPortfolio`와 동일한 형식으로 응답 반환
+      return {
+        total_asset: userRecord.final_asset,
+        profit_loss: userRecord.profit_loss,
+        profit_rate: userRecord.profit_rate,
+        cash: userRecord.final_cash, // `final_cash` 필드가 있다고 가정
+        holdings: userRecord.final_holdings || [], // `final_holdings` 필드가 있다고 가정
+      };
+    } catch (error) {
+      console.error("시즌 포트폴리오 요약 조회 오류:", error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError("internal", "시즌 포트폴리오 요약 조회에 실패했습니다.");
+    }
+  });

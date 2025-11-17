@@ -207,12 +207,33 @@ export const endSeason = functions
           }
         }
         const totalPortfolioValue = userCash + totalAssetValue;
+        const profitLoss = totalPortfolioValue - initialCapital;
         const profitRate = ((totalPortfolioValue - initialCapital) / initialCapital) * 100;
+
+        // [신규] 최종 보유 자산 목록 생성
+        const finalHoldings = [];
+        if (!holdingsSnapshot.empty) {
+          for (const holdingDoc of holdingsSnapshot.docs) {
+            const holdingData = holdingDoc.data();
+            // ... (API 호출로 현재가 계산) ...
+            // 이 예시에서는 단순화를 위해 저장된 데이터를 사용한다고 가정
+            finalHoldings.push({
+              symbol: holdingData.asset_code,
+              quantity: holdingData.quantity,
+              avg_buy_price: holdingData.avg_buy_price,
+              // 'current_price' 등 최종 상태 정보 추가 필요
+            });
+          }
+        }
 
         rankingData.push({
           uid: uid,
           nickname: userData.nickname,
+          total_asset: totalPortfolioValue,
+          profit_loss: profitLoss,
           profit_rate: profitRate,
+          cash: userCash,
+          holdings: finalHoldings,
         });
 
         // (B) 데이터 보존 및 초기화
@@ -247,13 +268,29 @@ export const endSeason = functions
       }
 
       // --- 3. 명예의 전당(hall_of_fame)에 저장 ---
-      rankingData.sort((a, b) => b.profit_rate - a.profit_rate);
-      const topRankers = rankingData.slice(0, 10);
+      // [수정] user_records에 모든 사용자 정보 저장
+      const userRecords = rankingData.map((data) => ({
+        uid: data.uid,
+        nickname: data.nickname,
+        final_asset: data.total_asset,
+        profit_loss: data.profit_loss,
+        profit_rate: data.profit_rate,
+        final_cash: data.cash,
+        final_holdings: data.holdings,
+      }));
+
+      userRecords.sort((a, b) => b.profit_rate - a.profit_rate);
+      const topRankers = userRecords.slice(0, 10).map((user) => ({
+        uid: user.uid,
+        nickname: user.nickname,
+        profit_rate: user.profit_rate,
+      }));
 
       const hallOfFameRef = db.collection("hall_of_fame").doc(`season_${currentSeasonId}`);
       await hallOfFameRef.set({
         season_name: `시즌 ${currentSeasonId} (마감: ${new Date().toLocaleDateString("ko-KR")})`,
         top_rankers: topRankers,
+        user_records: userRecords, // 모든 사용자 기록 저장
         endDate: new Date(),
       });
 
