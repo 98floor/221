@@ -31,6 +31,7 @@ import PostWritePage from './pages/PostWritePage';
 
 // [신규] App 컴포넌트의 내용을 분리 (useLocation 훅을 사용하기 위함)
 function AppContent() {
+  const location = useLocation(); // 현재 경로를 가져오기 위해 추가
   const navLinks = [
     { name: '공지사항', path: '/notice' }, 
     { name: '해외 주식', path: '/market' },
@@ -62,8 +63,8 @@ function AppContent() {
 
   return (
     <>
-      {/* --- MUI AppBar (네비게이션) --- */}
-      <AppBar position="static" color="default" elevation={1} sx={{ backgroundColor: 'white' }}>
+      {/* --- [수정] MUI AppBar (네비게이션) --- */}
+      <AppBar position="static" color="default" elevation={0} sx={{ backgroundColor: 'white', borderBottom: '1px solid #e0e0e0' }}>
         {/* [수정됨] Container의 maxWidth를 'xl'로 변경 */}
         <Container maxWidth="xl">
           <Toolbar disableGutters>
@@ -76,7 +77,7 @@ function AppContent() {
               sx={{
                 marginRight: 2, 
                 fontWeight: 700,
-                color: '#1976d2',
+                color: 'primary.main', // 테마 색상 사용
                 textDecoration: 'none',
                 flexShrink: 0, 
               }}
@@ -98,15 +99,21 @@ function AppContent() {
                 if (link.adminOnly && role !== 'admin') {
                   return null; 
                 }
+                const isActive = location.pathname === link.path;
                 return (
                   <Button
                     key={link.name}
                     component={RouterLink}
                     to={link.path}
                     sx={{ 
-                      color: 'black', 
                       marginX: 1.5,
-                      flexShrink: 0, 
+                      flexShrink: 0,
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? 'primary.main' : 'text.primary',
+                      backgroundColor: isActive ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                      }
                     }}
                   >
                     {link.name}
