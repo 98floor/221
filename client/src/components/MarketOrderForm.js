@@ -113,10 +113,12 @@ function OrderForm({ symbol, stockInfo }) {
 
   // [신규] 비율 버튼 클릭 핸들러
   const handlePercentClick = (percent) => {
+    const TRADE_FEE_RATE = 0.0025; // 수수료 (0.25%)
     let newAmount = 0;
     if (tabIndex === 0) {
-      // '매수' 탭: 보유 현금 기준
-      newAmount = availableCash * percent;
+      // '매수' 탭: 수수료를 고려한 최대 매수 가능 금액 계산
+      const maxAmount = availableCash / (1 + TRADE_FEE_RATE);
+      newAmount = maxAmount * percent;
     } else {
       // '매도' 탭: 총 평가액 (보유수량 * 현재가) 기준
       const maxAmount = heldQuantity * currentPrice;

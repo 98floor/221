@@ -135,10 +135,8 @@ export const buyAsset = functions
         }
         const userCash = userData["virtual_asset"];
 
-        // --- [신규] 수수료 계산 로직 ---
         const fee = totalCost * TRADE_FEE_RATE;
         const totalDeduction = totalCost + fee;
-        // --- 로직 종료 ---
 
         if (userCash < totalDeduction) {
           throw new functions.https.HttpsError(
@@ -147,7 +145,6 @@ export const buyAsset = functions
           );
         }
 
-        const newCash = userCash - totalDeduction;
         const holdingRef = userRef.collection("holdings").doc(symbol);
         const holdingDoc = await transaction.get(holdingRef);
 
@@ -156,42 +153,44 @@ export const buyAsset = functions
           if (!holdingData) {
             throw new functions.https.HttpsError("internal", "보유 자산 데이터를 읽을 수 없습니다.");
           }
-          const oldQuantity = holdingData["quantity"];
-          const oldAvgPrice = holdingData["avg_buy_price"];
+          const oldQuantity = holdingData["quantity"] || 0;
+          const oldAvgPrice = holdingData["avg_buy_price"] || 0;
+
           const newTotalQuantity = oldQuantity + quantityToTrade;
           const newAvgPrice =
             (oldAvgPrice * oldQuantity + currentPrice * quantityToTrade) /
             newTotalQuantity;
+
           transaction.update(holdingRef, {
-            quantity: newTotalQuantity,
-            avg_buy_price: newAvgPrice,
+            quantity: parseFloat(newTotalQuantity.toFixed(8)),
+            avg_buy_price: parseFloat(newAvgPrice.toFixed(4)),
           });
         } else {
           transaction.set(holdingRef, {
             asset_code: symbol,
-            quantity: quantityToTrade,
-            avg_buy_price: currentPrice,
+            quantity: parseFloat(quantityToTrade.toFixed(8)),
+            avg_buy_price: parseFloat(currentPrice.toFixed(4)),
           });
         }
 
-        // --- [수정됨] 거래 내역에 seasonId 추가 ---
         const transactionData = {
           type: "buy",
           asset_code: symbol,
           quantity: quantityToTrade,
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
-          seasonId: currentSeasonId, // 시즌 ID 추가
-          fee: fee, // 수수료 기록
+          seasonId: currentSeasonId,
+          fee: fee,
         };
 
         const txRef = userRef.collection("transactions").doc();
         transaction.set(txRef, transactionData);
         const allTimeTxRef = userRef.collection("all_time_transactions").doc();
         transaction.set(allTimeTxRef, transactionData);
-        // --- 수정 끝 ---
 
-        transaction.update(userRef, {virtual_asset: newCash});
+        transaction.update(userRef, {
+          virtual_asset: FieldValue.increment(Math.round(-totalDeduction * 10000) / 10000),
+        });
       });
 
       return {success: true, message: "매수 처리가 완료되었습니다."};
@@ -277,48 +276,47 @@ export const sellAsset = functions
         if (!holdingData) {
           throw new functions.https.HttpsError("internal", "보유 자산 데이터를 읽을 수 없습니다.");
         }
-        const heldQuantity = holdingData["quantity"];
+        const heldQuantity = holdingData["quantity"] || 0;
+
         if (heldQuantity < quantityToTrade) {
           throw new functions.https.HttpsError(
             "failed-precondition",
             `보유 수량이 부족합니다. (보유: ${heldQuantity.toFixed(
-              4
-            )} / 요청: ${quantityToTrade.toFixed(4)})`
+              8
+            )} / 요청: ${quantityToTrade.toFixed(8)})`
           );
         }
 
         const newHeldQuantity = heldQuantity - quantityToTrade;
-        if (newHeldQuantity <= 0.00001) {
+        if (newHeldQuantity < 1e-8) { // Use epsilon for float comparison
           transaction.delete(holdingRef);
         } else {
-          transaction.update(holdingRef, {quantity: newHeldQuantity});
+          transaction.update(holdingRef, {
+            quantity: parseFloat(newHeldQuantity.toFixed(8)),
+          });
         }
 
-        // --- [신규] 수수료 계산 로직 ---
         const fee = totalSaleValue * TRADE_FEE_RATE;
         const totalAddition = totalSaleValue - fee;
-        // --- 로직 종료 ---
 
-        // --- [수정됨] 거래 내역에 seasonId 추가 ---
         const transactionData = {
           type: "sell",
           asset_code: symbol,
           quantity: quantityToTrade,
           trade_price: currentPrice,
           trade_dt: FieldValue.serverTimestamp(),
-          seasonId: currentSeasonId, // 시즌 ID 추가
-          fee: fee, // 수수료 기록
+          seasonId: currentSeasonId,
+          fee: fee,
         };
 
         const txRef = userRef.collection("transactions").doc();
         transaction.set(txRef, transactionData);
         const allTimeTxRef = userRef.collection("all_time_transactions").doc();
         transaction.set(allTimeTxRef, transactionData);
-        // --- 수정 끝 ---
 
-        const userCash = userData["virtual_asset"];
-        const newCash = userCash + totalAddition;
-        transaction.update(userRef, {virtual_asset: newCash});
+        transaction.update(userRef, {
+          virtual_asset: FieldValue.increment(Math.round(totalAddition * 10000) / 10000),
+        });
       });
 
       return {success: true, message: "매도 처리가 완료되었습니다."};

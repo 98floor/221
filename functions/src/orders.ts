@@ -59,16 +59,22 @@ export const placeMarketOrder = functions
           const totalDeduction = cost + fee;
 
           if (userData.virtual_asset < totalDeduction) {
-            throw new functions.https.HttpsError("failed-precondition", "가상 자산이 부족합니다.");
+            throw new functions.https.HttpsError("failed-precondition", `가상 자산이 부족합니다. (필요: ${totalDeduction.toLocaleString()} / 보유: ${userData.virtual_asset.toLocaleString()})`);
           }
+
           transaction.update(userRef, {
-            virtual_asset: FieldValue.increment(-totalDeduction),
+            virtual_asset: FieldValue.increment(Math.round(-totalDeduction * 10000) / 10000),
           });
-          const newQuantity =
-            (holdingDoc.exists ? holdingDoc.data()?.quantity : 0) + quantity;
+
+          const existingQuantity = holdingDoc.exists ? holdingDoc.data()?.quantity : 0;
+          const newQuantity = existingQuantity + quantity;
+
           transaction.set(
             holdingRef,
-            {asset_code: assetCode, quantity: newQuantity},
+            {
+              asset_code: assetCode,
+              quantity: parseFloat(newQuantity.toFixed(8)),
+            },
             {merge: true}
           );
         } else {
@@ -84,11 +90,16 @@ export const placeMarketOrder = functions
           const totalAddition = saleValue - fee;
 
           transaction.update(userRef, {
-            virtual_asset: FieldValue.increment(totalAddition),
+            virtual_asset: FieldValue.increment(Math.round(totalAddition * 10000) / 10000),
           });
-          const newQuantity = holdingDoc.data()?.quantity - quantity;
-          if (newQuantity > 0) {
-            transaction.update(holdingRef, {quantity: newQuantity});
+
+          const existingQuantity = holdingDoc.data()?.quantity;
+          const newQuantity = existingQuantity - quantity;
+
+          if (newQuantity > 1e-8) { // 0에 가까운 값인지 확인
+            transaction.update(holdingRef, {
+              quantity: parseFloat(newQuantity.toFixed(8)),
+            });
           } else {
             transaction.delete(holdingRef);
           }
