@@ -2,12 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Table, TableContainer, TableBody, TableCell, TableHead, TableRow, Skeleton } from '@mui/material';
 
 // 헬퍼 함수 (기존과 동일)
 const formatDate = (timestamp) => {
   if (timestamp) {
-    return timestamp.toDate().toLocaleString('ko-KR');
+    return timestamp.toDate().toLocaleString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
   }
   return '날짜 정보 없음';
 };
@@ -16,36 +19,30 @@ const formatNumber = (num, type = 'krw') => {
   if (type === 'krw') {
     return `${Math.round(num).toLocaleString('ko-KR')}원`;
   }
-  return `${num.toLocaleString('ko-KR')}주`;
+  return `${parseFloat(num.toFixed(4)).toLocaleString('ko-KR')}주`;
 };
 
 function TransactionHistory({ symbol }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentSeasonId, setCurrentSeasonId] = useState(null); // [신규] 현재 시즌 ID state
+  const [currentSeasonId, setCurrentSeasonId] = useState(null);
 
-  // [신규] 컴포넌트 마운트 시 현재 시즌 ID를 가져옴
   useEffect(() => {
     const fetchCurrentSeason = async () => {
       const seasonDocRef = doc(db, "seasons", "current");
       try {
         const seasonDoc = await getDoc(seasonDocRef);
-        if (seasonDoc.exists()) {
-          setCurrentSeasonId(seasonDoc.data().seasonId);
-        } else {
-          setCurrentSeasonId(1); // 문서가 없으면 기본값 1
-        }
+        setCurrentSeasonId(seasonDoc.exists() ? seasonDoc.data().seasonId : 1);
       } catch (err) {
         console.error("현재 시즌 ID 조회 실패:", err);
-        setCurrentSeasonId(1); // 에러 시 기본값
+        setCurrentSeasonId(1);
       }
     };
     fetchCurrentSeason();
   }, []);
 
   useEffect(() => {
-    // [수정] 로그인 안 했거나, symbol 또는 currentSeasonId가 없으면 실행 안 함
     if (!auth.currentUser || !symbol || currentSeasonId === null) {
       setTransactions([]);
       return;
@@ -55,23 +52,15 @@ function TransactionHistory({ symbol }) {
     setError(null);
 
     const txCollectionRef = collection(db, "users", auth.currentUser.uid, "transactions");
-    
-    // [수정] 쿼리에 seasonId 필터 추가
     const q = query(
-      txCollectionRef, 
+      txCollectionRef,
       where("asset_code", "==", symbol),
-      where("seasonId", "==", currentSeasonId), // 현재 시즌 필터
+      where("seasonId", "==", currentSeasonId),
       orderBy("trade_dt", "desc")
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const txData = [];
-      querySnapshot.forEach((doc) => {
-        txData.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
+      const txData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTransactions(txData);
       setLoading(false);
     }, (err) => {
@@ -81,47 +70,60 @@ function TransactionHistory({ symbol }) {
     });
 
     return () => unsubscribe();
-
-  }, [symbol, currentSeasonId]); // currentSeasonId가 변경될 때도 쿼리 재실행
+  }, [symbol, currentSeasonId]);
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <Typography variant="h6" gutterBottom>
+    <Box>
+      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 2 }}>
         나의 거래 내역 (현재 시즌)
       </Typography>
-      {loading && <p>거래 내역을 불러오는 중...</p>}
-      {error && <p style={{ color: 'red' }}>오류: {error}</p>}
-      
-      {!loading && !error && transactions.length === 0 && (
-        <p>현재 시즌의 거래 내역이 없습니다.</p>
-      )}
-
-      {transactions.length > 0 && (
-        <Box sx={{ maxHeight: '300px', overflowY: 'auto' }}>
-          <table border="1" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em' }}>
-            <thead>
-              <tr>
-                <th>거래 시간</th>
-                <th>구분</th>
-                <th>수량</th>
-                <th>거래 단가</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((tx) => (
-                <tr key={tx.id}>
-                  <td>{formatDate(tx.trade_dt)}</td>
-                  <td style={{ color: tx.type === 'buy' ? 'red' : 'blue' }}>
+      <TableContainer sx={{ maxHeight: 350, border: '1px solid #eee', borderRadius: 1 }}>
+        <Table stickyHeader size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{backgroundColor: '#f9f9f9'}}>시간</TableCell>
+              <TableCell sx={{backgroundColor: '#f9f9f9'}}>구분</TableCell>
+              <TableCell align="right" sx={{backgroundColor: '#f9f9f9'}}>수량</TableCell>
+              <TableCell align="right" sx={{backgroundColor: '#f9f9f9'}}>거래단가</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading && (
+              [...Array(3)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={4}><Skeleton variant="text" /></TableCell>
+                </TableRow>
+              ))
+            )}
+            {!loading && error && (
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ color: 'red' }}>
+                  오류: {error}
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && !error && transactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  현재 시즌의 거래 내역이 없습니다.
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && !error && transactions.map((tx) => (
+              <TableRow key={tx.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <TableCell sx={{ fontSize: '0.8rem' }}>{formatDate(tx.trade_dt)}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ color: tx.type === 'buy' ? 'error.main' : 'primary.main', fontWeight: 'bold' }}>
                     {tx.type === 'buy' ? '매수' : '매도'}
-                  </td>
-                  <td>{formatNumber(tx.quantity, 'qty')}</td>
-                  <td>{formatNumber(tx.trade_price, 'krw')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
-      )}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">{formatNumber(tx.quantity, 'qty')}</TableCell>
+                <TableCell align="right">{formatNumber(tx.trade_price, 'krw')}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 }

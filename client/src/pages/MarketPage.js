@@ -3,6 +3,7 @@ import { functions, auth } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Star, StarBorder } from '@mui/icons-material'; // 아이콘은 유지
+import { Divider } from '@mui/material';
 
 import MarketOrderForm from '../components/MarketOrderForm';
 import TradingViewWidget from '../components/TradingViewWidget';
@@ -131,6 +132,7 @@ function MarketPage() {
           <div className="order-form-container">
             <MarketOrderForm symbol={activeSymbol} stockInfo={stockInfo} />
           </div>
+          <Divider orientation="vertical" flexItem />
           <div className="transaction-history-container">
             <TransactionHistory symbol={activeSymbol} />
           </div>

@@ -87,8 +87,8 @@ function FavoritesList({ onFavoriteClick, refreshTrigger }) {
   }, [refreshTrigger, fetchFavoritesData]);
 
   return (
-    <Box sx={{ border: '1px solid #eee', borderRadius: 1, mt: 2 }}>
-      <Typography variant="h6" sx={{ p: 2, borderBottom: '1px solid #eee' }}>
+    <Box>
+      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 2 }}>
         관심 종목
       </Typography>
       <TableContainer sx={{ maxHeight: 400, overflowY: 'auto' }}>

@@ -37,11 +37,11 @@ function NewsList({ symbol }) {
     }, [symbol]); // symbol이 바뀔 때마다 (새로 검색할 때마다) 새로 실행
 
     return (
-        <Box sx={{ border: '1px solid #eee', borderRadius: 1, mt: 2 }}>
-            <Typography variant="h6" sx={{ p: 2, borderBottom: '1px solid #eee' }}>
+        <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 2 }}>
                 주요 뉴스
             </Typography>
-            <Box sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
+            <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
                 {loading && (
                     [...Array(3)].map((_, i) => <Skeleton key={i} variant="text" sx={{ mb: 1 }} />)
                 )}
