@@ -4,6 +4,36 @@ import { db, functions } from '../firebase'; // db와 functions 모두 임포트
 import { httpsCallable } from 'firebase/functions'; //  Cloud Function 호출 도구
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'; //  Firestore 읽기 도구
 
+// [신규] 배지를 스타일링하여 보여주는 헬퍼 컴포넌트
+const Badge = ({ badge }) => {
+  if (!badge) return null;
+
+  const style = {
+    marginLeft: '8px',
+    padding: '2px 8px',
+    borderRadius: '10px',
+    fontSize: '0.75em',
+    fontWeight: 'bold',
+    color: 'black',
+    border: '1px solid #ccc',
+  };
+
+  if (badge === '실버') {
+    style.backgroundColor = '#E0E0E0';
+    style.borderColor = '#BDBDBD';
+  } else if (badge === '골드') {
+    style.backgroundColor = '#FFD700';
+    style.borderColor = '#FFA000';
+  } else if (badge === '마스터') {
+    style.backgroundColor = '#E1BEE7';
+    style.borderColor = '#9C27B0';
+    style.color = '#6A1B9A';
+  }
+
+  return <span style={style}>{badge}</span>;
+};
+
+
 function CommunityPage() {
   // 글 작성용 state
   const [title, setTitle] = useState('');
@@ -140,7 +170,7 @@ function CommunityPage() {
           <thead>
             <tr>
               <th style={{width: '60%'}}>제목</th>
-              <th>작성자 ID (UID 일부)</th>
+              <th>작성자</th>
               <th>내용</th>
               <th>작성 시간</th>
             </tr>
@@ -149,8 +179,11 @@ function CommunityPage() {
             {posts.map((post) => (
               <tr key={post.id}>
                 <td>{post.title}</td>
-                {/* UID는 너무 길어서 앞 8자리만 표시 (참고용) */}
-                <td>{post.user_id.substring(0, 8)}...</td>
+                {/* [수정] 닉네임과 배지를 함께 표시 */}
+                <td>
+                  {post.nickname || '알 수 없음'}
+                  <Badge badge={post.badge} />
+                </td>
                 <td>{post.content}</td>
                 {/* Firestore Timestamp 객체를 변환 */}
                 <td>{formatDate(post.created_at)}</td>

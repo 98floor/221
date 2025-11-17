@@ -25,6 +25,7 @@ import ChatbotPage from './pages/ChatbotPage';
 import AdminPage from './pages/AdminPage';
 import NoticePage from './pages/NoticePage'; 
 import PasswordResetPage from './pages/PasswordResetPage';
+import QuestPage from './pages/QuestPage'; // [신규] 퀘스트 페이지 임포트
 
 // [신규] App 컴포넌트의 내용을 분리 (useLocation 훅을 사용하기 위함)
 function AppContent() {
@@ -37,6 +38,7 @@ function AppContent() {
     { name: '게시판', path: '/community' },
     { name: 'O/X 예측', path: '/debate' },
     { name: '퀴즈', path: '/quiz' },
+    { name: '퀘스트', path: '/quest' }, // [신규] 퀘스트 링크 추가
     { name: 'AI 챗봇', path: '/chatbot' },
     { name: '관리자', path: '/admin', adminOnly: true }, 
   ];
@@ -187,6 +189,7 @@ function AppContent() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/debate" element={<DebatePage />} />
           <Route path="/quiz" element={<QuizPage />} />
+          <Route path="/quest" element={<QuestPage />} /> {/* [신규] 퀘스트 라우트 추가 */}
           <Route path="/chatbot" element={<ChatbotPage />} />
           <Route 
             path="/admin" 

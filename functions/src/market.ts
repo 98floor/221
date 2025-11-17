@@ -74,7 +74,6 @@ export const getMarketData = functions
 export const buyAsset = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // ... (기존 코드와 동일)
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
@@ -86,24 +85,22 @@ export const buyAsset = functions
     const {symbol, quantity, amount} = data;
 
     try {
-      // --- 현재 시즌 ID 가져오기 ---
       const seasonRef = db.collection("seasons").doc("current");
       const seasonDoc = await seasonRef.get();
       const currentSeasonId = seasonDoc.exists ? seasonDoc.data()?.seasonId : 1;
-      // --- 시즌 ID 가져오기 끝 ---
 
       const apiResponse = await axios.get(
         `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
       );
       let currentPrice = apiResponse.data.c;
 
-      // ... (가격 계산 로직은 기존과 동일)
       if (currentPrice === 0) {
         throw new functions.https.HttpsError("not-found", "시세 정보를 찾을 수 없습니다.");
       }
       if (!symbol.toUpperCase().endsWith(".KS")) {
         currentPrice *= EXCHANGE_RATE_USD_TO_KRW;
       }
+
       let quantityToTrade: number;
       let totalCost: number;
       if (amount) {
@@ -125,7 +122,15 @@ export const buyAsset = functions
       const userRef = db.collection("users").doc(uid);
 
       await db.runTransaction(async (transaction) => {
+        // --- 1. READ PHASE ---
         const userDoc = await transaction.get(userRef);
+        const holdingRef = userRef.collection("holdings").doc(symbol);
+        const holdingDoc = await transaction.get(holdingRef);
+        const questRef = userRef.collection("quest_progress").doc("summary");
+        const questDoc = await transaction.get(questRef);
+        const holdingsSnapshot = await transaction.get(userRef.collection("holdings"));
+
+        // --- 2. LOGIC & VALIDATION PHASE ---
         if (!userDoc.exists) {
           throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
         }
@@ -133,11 +138,10 @@ export const buyAsset = functions
         if (!userData) {
           throw new functions.https.HttpsError("internal", "사용자 데이터를 읽을 수 없습니다.");
         }
-        const userCash = userData["virtual_asset"];
 
+        const userCash = userData["virtual_asset"];
         const fee = totalCost * TRADE_FEE_RATE;
         const totalDeduction = totalCost + fee;
-
         if (userCash < totalDeduction) {
           throw new functions.https.HttpsError(
             "failed-precondition",
@@ -145,31 +149,34 @@ export const buyAsset = functions
           );
         }
 
-        const holdingRef = userRef.collection("holdings").doc(symbol);
-        const holdingDoc = await transaction.get(holdingRef);
+        const isNewHolding = !holdingDoc.exists;
+        const questData = questDoc.exists ? questDoc.data() : null;
+        const isBeginnerQuestInProgress = questData?.beginner_status === "in_progress" || !questDoc.exists;
+        let holdingsCount = holdingsSnapshot.size;
+        if (isNewHolding) {
+          holdingsCount++;
+        }
+        const shouldCompleteBeginnerQuest = isBeginnerQuestInProgress && holdingsCount >= 3;
 
-        if (holdingDoc.exists) {
+        // --- 3. WRITE PHASE ---
+        if (isNewHolding) {
+          transaction.set(holdingRef, {
+            asset_code: symbol,
+            quantity: parseFloat(quantityToTrade.toFixed(8)),
+            avg_buy_price: parseFloat(currentPrice.toFixed(4)),
+          });
+        } else {
           const holdingData = holdingDoc.data();
           if (!holdingData) {
             throw new functions.https.HttpsError("internal", "보유 자산 데이터를 읽을 수 없습니다.");
           }
           const oldQuantity = holdingData["quantity"] || 0;
           const oldAvgPrice = holdingData["avg_buy_price"] || 0;
-
           const newTotalQuantity = oldQuantity + quantityToTrade;
-          const newAvgPrice =
-            (oldAvgPrice * oldQuantity + currentPrice * quantityToTrade) /
-            newTotalQuantity;
-
+          const newAvgPrice = (oldAvgPrice * oldQuantity + currentPrice * quantityToTrade) / newTotalQuantity;
           transaction.update(holdingRef, {
             quantity: parseFloat(newTotalQuantity.toFixed(8)),
             avg_buy_price: parseFloat(newAvgPrice.toFixed(4)),
-          });
-        } else {
-          transaction.set(holdingRef, {
-            asset_code: symbol,
-            quantity: parseFloat(quantityToTrade.toFixed(8)),
-            avg_buy_price: parseFloat(currentPrice.toFixed(4)),
           });
         }
 
@@ -182,7 +189,6 @@ export const buyAsset = functions
           seasonId: currentSeasonId,
           fee: fee,
         };
-
         const txRef = userRef.collection("transactions").doc();
         transaction.set(txRef, transactionData);
         const allTimeTxRef = userRef.collection("all_time_transactions").doc();
@@ -191,6 +197,25 @@ export const buyAsset = functions
         transaction.update(userRef, {
           virtual_asset: FieldValue.increment(Math.round(-totalDeduction * 10000) / 10000),
         });
+
+        if (!questDoc.exists) {
+          transaction.set(questRef, {
+            beginner_status: "in_progress",
+            intermediate_status: "locked",
+            advanced_status: "locked",
+            ox_correct_answers: 0,
+            profit_rate_achieved: false,
+          });
+          transaction.update(userRef, {badge: null});
+        }
+
+        if (shouldCompleteBeginnerQuest) {
+          transaction.update(questRef, {
+            beginner_status: "completed",
+            intermediate_status: "in_progress",
+          });
+          transaction.update(userRef, {badge: "실버"});
+        }
       });
 
       return {success: true, message: "매수 처리가 완료되었습니다."};

@@ -44,6 +44,36 @@ interface SchoolRanking {
   member_count: number;
 }
 
+/**
+ * [신규] 중급 퀘스트 완료 여부를 확인하고 상태를 업데이트하는 헬퍼 함수
+ * @param {FirebaseFirestore.DocumentReference} userRef 사용자 문서 참조
+ */
+const checkIntermediateQuestCompletion = async (
+  userRef: FirebaseFirestore.DocumentReference
+) => {
+  const questRef = userRef.collection("quest_progress").doc("summary");
+  const questDoc = await questRef.get();
+
+  if (!questDoc.exists) return;
+  const questData = questDoc.data();
+  if (!questData) return;
+
+  // 중급 퀘스트가 진행 중이고, 아직 완료되지 않았을 때만 확인
+  if (questData.intermediate_status === "in_progress") {
+    const profitRateAchieved = questData.profit_rate_achieved === true;
+    const oxAnswersCorrect = questData.ox_correct_answers >= 5;
+
+    // 두 조건이 모두 충족되면 퀘스트 완료 처리
+    if (profitRateAchieved && oxAnswersCorrect) {
+      await questRef.update({
+        intermediate_status: "completed",
+        advanced_status: "in_progress", // 고급 퀘스트 잠금 해제
+      });
+      await userRef.update({badge: "골드"}); // 골드 배지 지급
+    }
+  }
+};
+
 
 // [UC-6] 자신의 포트폴리오(자산, 수익률) 확인 (수정본: 환율 적용)
 export const getPortfolio = functions
@@ -218,6 +248,26 @@ export const calculateRankings = functions
 
         const totalPortfolioValue = userCash + totalAssetValue;
         const profitRate = ((totalPortfolioValue - initialCapital) / initialCapital) * 100;
+
+        // --- [신규] 퀘스트 진행 상황 업데이트 (수익률) ---
+        const userRef = userDoc.ref;
+        const questRef = userRef.collection("quest_progress").doc("summary");
+        const questDoc = await questRef.get();
+
+        if (questDoc.exists) {
+          const questData = questDoc.data();
+          if (questData &&
+              questData.intermediate_status === "in_progress" &&
+              !questData.profit_rate_achieved
+          ) {
+            if (profitRate >= 10) {
+              await questRef.update({profit_rate_achieved: true});
+              // 수익률 조건 달성 후, 중급 퀘스트 전체 완료 여부 확인
+              await checkIntermediateQuestCompletion(userRef);
+            }
+          }
+        }
+        // --- 퀘스트 로직 끝 ---
 
         personalRankings.push({
           uid: uid,

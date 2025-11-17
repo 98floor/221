@@ -2,6 +2,37 @@
 import * as functions from "firebase-functions/v1";
 import {db, FieldValue} from "./index";
 
+/**
+ * [신규] 중급 퀘스트 완료 여부를 확인하고 상태를 업데이트하는 헬퍼 함수
+ * @param {FirebaseFirestore.DocumentReference} userRef 사용자 문서 참조
+ */
+const checkIntermediateQuestCompletion = async (
+  userRef: FirebaseFirestore.DocumentReference
+) => {
+  const questRef = userRef.collection("quest_progress").doc("summary");
+  const questDoc = await questRef.get();
+
+  if (!questDoc.exists) return;
+  const questData = questDoc.data();
+  if (!questData) return;
+
+  // 중급 퀘스트가 진행 중이고, 아직 완료되지 않았을 때만 확인
+  if (questData.intermediate_status === "in_progress") {
+    const profitRateAchieved = questData.profit_rate_achieved === true;
+    // 중요: 업데이트된 값을 바로 알 수 없으므로, 현재 값에 1을 더해서 확인
+    const oxAnswersCorrect = questData.ox_correct_answers + 1 >= 5;
+
+    // 두 조건이 모두 충족되면 퀘스트 완료 처리
+    if (profitRateAchieved && oxAnswersCorrect) {
+      await questRef.update({
+        intermediate_status: "completed",
+        advanced_status: "in_progress", // 고급 퀘스트 잠금 해제
+      });
+      await userRef.update({badge: "골드"}); // 골드 배지 지급
+    }
+  }
+};
+
 // 토론 주제 생성 함수
 export const createDebate = functions
   .region("asia-northeast3")
@@ -154,14 +185,25 @@ export const closeDebate = functions
         }
       }
 
-      // 3. 보상 지급 (Batch Write 사용)
+      // 3. 보상 지급 및 퀘스트 진행 (Batch Write 사용)
       if (winnerUids.length > 0) {
         const batch = db.batch();
-        winnerUids.forEach((uid) => {
+        for (const uid of winnerUids) {
           const userRef = db.collection("users").doc(uid);
+          // 보상 지급
           batch.update(userRef, {virtual_asset: FieldValue.increment(rewardAmount)});
-        });
+
+          // [신규] 퀘스트 진행도 업데이트
+          const questRef = userRef.collection("quest_progress").doc("summary");
+          batch.update(questRef, {ox_correct_answers: FieldValue.increment(1)});
+        }
         await batch.commit();
+
+        // [신규] 퀘스트 완료 여부 최종 확인
+        for (const uid of winnerUids) {
+          const userRef = db.collection("users").doc(uid);
+          await checkIntermediateQuestCompletion(userRef);
+        }
       }
 
       // 4. 토론 상태를 'closed'로 변경하고 정답 기록

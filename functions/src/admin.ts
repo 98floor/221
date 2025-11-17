@@ -280,6 +280,24 @@ export const endSeason = functions
       }));
 
       userRecords.sort((a, b) => b.profit_rate - a.profit_rate);
+
+      // --- [신규] 고급 퀘스트(랭킹 10위 이내) 완료 처리 ---
+      const top10Uids = userRecords.slice(0, 10).map((record) => record.uid);
+      for (const uid of top10Uids) {
+        const userRef = db.collection("users").doc(uid);
+        const questRef = userRef.collection("quest_progress").doc("summary");
+        const questDoc = await questRef.get();
+
+        if (questDoc.exists) {
+          const questData = questDoc.data();
+          if (questData && questData.advanced_status === "in_progress") {
+            await questRef.update({advanced_status: "completed"});
+            await userRef.update({badge: "마스터"});
+          }
+        }
+      }
+      // --- 퀘스트 로직 끝 ---
+
       const topRankers = userRecords.slice(0, 10).map((user) => ({
         uid: user.uid,
         nickname: user.nickname,

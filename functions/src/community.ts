@@ -36,10 +36,22 @@ export const createPost = functions
     }
 
     try {
+      // [신규] 사용자 정보를 가져와서 닉네임과 배지를 함께 저장
+      const userRef = db.collection("users").doc(uid);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+      }
+      const userData = userDoc.data();
+      const nickname = userData?.nickname || "알 수 없는 사용자";
+      const badge = userData?.badge || null;
+
       const postData = {
         title: title,
         content: content,
         user_id: uid,
+        nickname: nickname, // 닉네임 추가
+        badge: badge, // 배지 추가
         created_at: FieldValue.serverTimestamp(),
       };
 
