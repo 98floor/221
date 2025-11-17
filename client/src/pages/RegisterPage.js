@@ -13,7 +13,6 @@ function RegisterPage() {
   const [nickname, setNickname] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [schoolName, setSchoolName] = useState('');
-  const [userLevel, setUserLevel] = useState('초급');
   const [isStudentChecked, setIsStudentChecked] = useState(false);
   const [nicknameMessage, setNicknameMessage] = useState('');
   const [isNicknameAvailable, setIsNicknameAvailable] = useState(false);
@@ -72,7 +71,7 @@ function RegisterPage() {
     if (!isNicknameAvailable) return setError("닉네임 중복 확인을 해주세요.");
     if (!isStudentChecked) return setError("대학생(대학원생) 확인 항목에 체크해야 합니다.");
     if (!email.endsWith('.ac.kr')) return setError("대학교 웹메일(.ac.kr)만 가입할 수 있습니다.");
-    if (!email || !password || !nickname || !schoolName || !userLevel) return setError("모든 항목을 입력해주세요.");
+    if (!email || !password || !nickname || !schoolName) return setError("모든 항목을 입력해주세요.");
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -82,7 +81,6 @@ function RegisterPage() {
         email: user.email,
         nickname: nickname,
         school_name: schoolName,
-        user_level: userLevel,
         status: "pending_verification",
         virtual_asset: 0,
         quiz_try_cnt: 0,
@@ -150,18 +148,9 @@ function RegisterPage() {
           </select>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="userLevel">투자 숙련도</label>
-          <select id="userLevel" value={userLevel} onChange={(e) => setUserLevel(e.target.value)} required>
-            <option value="초급">초급</option>
-            <option value="중급">중급</option>
-            <option value="고급">고급</option>
-          </select>
-        </div>
-
         <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
           <input type="checkbox" id="isStudentChecked" checked={isStudentChecked} onChange={(e) => setIsStudentChecked(e.target.checked)} style={{ width: 'auto', marginRight: '10px' }} />
-          <label htmlFor="isStudentChecked" style={{ marginBottom: 0 }}>본인은 현재 재학 중인 대학생/대학원생이 맞습니다.</label>
+          <label htmlFor="isStudentChecked" style={{ marginBottom: 0, fontSize: '14px', whiteSpace: 'nowrap' }}>본인은 현재 재학 중인 대학생/대학원생이 맞습니다.</label>
         </div>
 
         <button type="submit" className="form-button">인증메일 발송 (회원가입)</button>
