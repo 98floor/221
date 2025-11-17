@@ -175,18 +175,21 @@ function PortfolioPage() {
           <p><strong>보유 현금: </strong>{formatNumber(portfolio.cash)}</p>
           <hr />
           <h3>보유 자산 목록 (현재 기준)</h3>
-          {portfolio.holdings.length > 0 ? (
-            <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-              <thead><tr><th>종목</th><th>보유 수량</th><th>평단가</th><th>현재가</th><th>평가 금액</th><th>손익</th><th>수익률</th></tr></thead>
-              <tbody>
-                {portfolio.holdings.map((stock) => (
-                  <tr key={stock.symbol}>
-                    <td>{stock.symbol}</td><td>{formatNumber(stock.quantity, 'qty')}</td><td>{formatNumber(stock.avg_buy_price)}</td><td>{formatNumber(stock.current_price)}</td><td>{formatNumber(stock.current_value)}</td><td style={{ color: stock.profit_loss >= 0 ? 'green' : 'red' }}>{formatNumber(stock.profit_loss)}</td><td style={{ color: stock.profit_rate >= 0 ? 'green' : 'red' }}>{formatNumber(stock.profit_rate, 'percent')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (<p>보유 중인 자산이 없습니다.</p>)}
+          {(() => {
+            const filteredHoldings = portfolio.holdings.filter(stock => stock.current_value >= 2);
+            return filteredHoldings.length > 0 ? (
+              <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                <thead><tr><th>종목</th><th>보유 수량</th><th>평단가</th><th>현재가</th><th>평가 금액</th><th>손익</th><th>수익률</th></tr></thead>
+                <tbody>
+                  {filteredHoldings.map((stock) => (
+                    <tr key={stock.symbol}>
+                      <td>{stock.symbol}</td><td>{formatNumber(stock.quantity, 'qty')}</td><td>{formatNumber(stock.avg_buy_price)}</td><td>{formatNumber(stock.current_price)}</td><td>{formatNumber(stock.current_value)}</td><td style={{ color: stock.profit_loss >= 0 ? 'green' : 'red' }}>{formatNumber(stock.profit_loss)}</td><td style={{ color: stock.profit_rate >= 0 ? 'green' : 'red' }}>{formatNumber(stock.profit_rate, 'percent')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (<p>보유 중인 자산이 없습니다.</p>);
+          })()}
         </div>
       )}
       <hr style={{marginTop: '40px'}} />
