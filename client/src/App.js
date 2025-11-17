@@ -33,7 +33,7 @@ import PostWritePage from './pages/PostWritePage';
 function AppContent() {
   const navLinks = [
     { name: '공지사항', path: '/notice' }, 
-    { name: '거래소', path: '/market' },
+    { name: '해외 주식', path: '/market' },
     { name: '자산', path: '/portfolio' },
     { name: '랭킹', path: '/ranking' },
     { name: '명예의 전당', path: '/hall-of-fame' },

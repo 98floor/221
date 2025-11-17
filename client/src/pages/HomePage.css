@@ -99,10 +99,40 @@
   color: var(--primary-color);
 }
 
-.notice-list li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--divider-color);
+.notice-list {
   list-style: none;
+  padding-left: 0; /* Remove default browser padding */
+}
+
+.notice-list li {
+  border-bottom: 1px solid var(--divider-color);
+}
+
+.notice-list li a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-primary);
+  padding: 0.75rem 0.25rem; /* Adjusted padding */
+}
+
+.notice-list li a:hover span:first-child {
+  color: var(--primary-color);
+}
+
+.notice-list li a span:first-child {
+  /* Title */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 1rem;
+}
+
+.notice-list li a small {
+  /* Date */
+  flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 .notice-list li:last-child {

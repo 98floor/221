@@ -61,17 +61,17 @@ export const getRecentNotices = functions
         .get();
 
       if (noticesSnapshot.empty) {
-        return { success: true, notices: [] };
+        return {success: true, notices: []};
       }
 
-      const notices = noticesSnapshot.docs.map(doc => ({
+      const notices = noticesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
         // Firestore Timestamp를 ISO 문자열로 변환
         createdAt: doc.data().createdAt.toDate().toISOString(),
       }));
 
-      return { success: true, notices: notices };
+      return {success: true, notices: notices};
     } catch (error) {
       console.error("최신 공지사항 조회 오류:", error);
       throw new functions.https.HttpsError("internal", "최신 공지사항을 불러오는 중 오류가 발생했습니다.");
@@ -97,7 +97,7 @@ export const deleteNotice = functions
     }
 
     // 2. Validate the input data
-    const { noticeId } = data;
+    const {noticeId} = data;
     if (!noticeId) {
       throw new functions.https.HttpsError(
         "invalid-argument",
@@ -108,7 +108,7 @@ export const deleteNotice = functions
     // 3. Delete the notice document from Firestore
     try {
       await db.collection("notices").doc(noticeId).delete();
-      return { success: true, message: "Notice deleted successfully." };
+      return {success: true, message: "Notice deleted successfully."};
     } catch (error) {
       console.error("Error deleting notice:", error);
       throw new functions.https.HttpsError(
