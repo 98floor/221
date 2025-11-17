@@ -87,7 +87,7 @@ function QuestPage() {
 
       <div className="quest-category">
         <h4>초급 퀘스트</h4>
-        <QuestItem title="포트폴리오 다각화" description="포트폴리오에 3개 이상의 다양한 종목을 보유하여 위험을 분산시키세요." status={progress.beginner_status} progressValue={progress.portfolio_diversity} progressMax={3} />
+        <QuestItem title="첫 구매 시작" description="3개 이상의 종목을 매수해 보세요." status={progress.beginner_status} progressValue={progress.portfolio_diversity} progressMax={3} />
       </div>
 
       <div className="quest-category">

@@ -1,4 +1,5 @@
 // client/src/App.js
+import './App.css';
 import React, { useState, useEffect } from 'react'; 
 // [수정됨] Link as RouterLink, useLocation 임포트
 import { BrowserRouter as Router, Routes, Route, Link as RouterLink, useLocation } from 'react-router-dom'; 

@@ -1,47 +1,115 @@
+/* client/src/pages/HomePage.css */
 .home-container {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.home-header {
+  background: linear-gradient(135deg, var(--primary-color), #673ab7);
+  color: white;
+  padding: 3rem 2rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 2rem;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  padding: 50px;
-  background-color: var(--container-bg-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  margin: 20px auto;
-  max-width: 1200px;
+  box-shadow: var(--shadow-md);
 }
 
-.home-content {
-  text-align: left;
-  margin-right: 40px;
-}
-
-.home-content h1 {
-  font-size: 48px;
+.home-header h1 {
+  margin: 0;
+  font-size: 2.5rem;
   font-weight: 700;
-  margin-bottom: 10px;
-  white-space: nowrap;
 }
 
-.home-content .highlight {
+.home-header p {
+  margin: 0.5rem 0 0;
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-card, .shortcut-card, .notice-card {
+  background-color: var(--surface-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover, .shortcut-card:hover, .notice-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+}
+
+.info-card h2, .shortcut-card h2, .notice-card h2 {
+  margin-top: 0;
+  font-size: 1.3rem;
+  color: var(--primary-color);
+  border-bottom: 2px solid var(--divider-color);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.info-item span:first-child {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.info-item span:last-child {
+  font-weight: 700;
+}
+
+.badge-display {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--secondary-color);
+}
+
+.shortcuts-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+.shortcut-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.shortcut-link:hover {
   color: var(--primary-color);
 }
 
-.home-content p {
-  font-size: 18px;
-  color: #666;
-  margin-bottom: 30px;
-  white-space: nowrap;
+.notice-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--divider-color);
+  list-style: none;
 }
 
-.home-buttons .btn {
-  margin-right: 15px;
-  padding: 12px 25px;
-  font-size: 18px;
-  text-transform: none;
+.notice-list li:last-child {
+  border-bottom: none;
 }
 
-.home-banner img {
-  max-width: 500px;
-  height: auto;
-  border-radius: 8px;
+ @keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

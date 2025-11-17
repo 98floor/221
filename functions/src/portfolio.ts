@@ -75,11 +75,10 @@ const checkIntermediateQuestCompletion = async (
 };
 
 
-// [UC-6] 자신의 포트폴리오(자산, 수익률) 확인 (수정본: 환율 적용)
+// [UC-6] 자신의 포트폴리오(자산, 수익률) 확인 (수정본: 환율 적용 및 랭킹 정보 추가)
 export const getPortfolio = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
-    // 🔽 [수정됨] API 키 확인 로직을 함수 내부로 이동
     if (!FINNHUB_API_KEY) {
       throw new functions.https.HttpsError("internal", "FINNHUB_API_KEY가 설정되지 않았습니다.");
     }
@@ -103,6 +102,19 @@ export const getPortfolio = functions
         throw new functions.https.HttpsError("internal", "사용자 데이터를 읽을 수 없습니다.");
       }
 
+      // [신규] 랭킹 정보 조회
+      const rankingRef = db.collection("ranking").doc("current_season");
+      const rankingDoc = await rankingRef.get();
+      let userRank = null;
+      if (rankingDoc.exists) {
+        const rankingData = rankingDoc.data();
+        // `personal_ranking` 배열에서 현재 사용자의 uid를 찾아 인덱스를 가져옴
+        const userIndex = rankingData?.personal_ranking?.findIndex((p: any) => p.uid === uid);
+        if (userIndex !== -1) {
+          userRank = userIndex + 1; // 랭킹은 1부터 시작
+        }
+      }
+
       const userCash = userData["virtual_asset"];
       const holdingsRef = userRef.collection("holdings");
       const holdingsSnapshot = await holdingsRef.get();
@@ -110,16 +122,19 @@ export const getPortfolio = functions
       if (holdingsSnapshot.empty) {
         const profitLoss = userCash - initialCapital;
         const profitRate = ((userCash - initialCapital) / initialCapital) * 100;
+        // [수정] 반환 형식을 { portfolioData: { ... } } 로 감쌈
         return {
-          total_asset: userCash,
-          profit_loss: profitLoss,
-          profit_rate: profitRate,
-          cash: userCash,
-          holdings: [],
+          portfolioData: {
+            total_asset: userCash,
+            profit_loss: profitLoss,
+            profit_rate: profitRate,
+            cash: userCash,
+            holdings: [],
+            rank: userRank, // 랭킹 정보 추가
+          },
         };
       }
 
-      // [수정됨] holdings: any[] -> holdings: Holding[]
       const holdings: Holding[] = [];
       let totalAssetValue = 0;
 
@@ -163,12 +178,16 @@ export const getPortfolio = functions
       const totalProfitLoss = totalPortfolioValue - initialCapital;
       const totalProfitRate = ((totalPortfolioValue - initialCapital) / initialCapital) * 100;
 
+      // [수정] 반환 형식을 { portfolioData: { ... } } 로 감쌈
       return {
-        total_asset: totalPortfolioValue,
-        profit_loss: totalProfitLoss,
-        profit_rate: totalProfitRate,
-        cash: userCash,
-        holdings: holdings,
+        portfolioData: {
+          total_asset: totalPortfolioValue,
+          profit_loss: totalProfitLoss,
+          profit_rate: totalProfitRate,
+          cash: userCash,
+          holdings: holdings,
+          rank: userRank, // 랭킹 정보 추가
+        },
       };
     } catch (error) {
       console.error("포트폴리오 조회 오류:", error);

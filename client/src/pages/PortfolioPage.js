@@ -58,7 +58,7 @@ function PortfolioPage() {
       try {
         const getPortfolio = httpsCallable(functions, 'getPortfolio');
         const result = await getPortfolio();
-        setPortfolio(result.data);
+        setPortfolio(result.data.portfolioData); // [수정] portfolioData 키를 통해 실제 데이터에 접근
       } catch (err) {
         setErrorPortfolio(err.message);
       } finally {

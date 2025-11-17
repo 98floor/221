@@ -50,3 +50,30 @@ export const createNotice = functions
       throw new functions.https.HttpsError("internal", "공지사항 작성 중 오류가 발생했습니다.");
     }
   });
+
+export const getRecentNotices = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    try {
+      const noticesSnapshot = await db.collection("notices")
+        .orderBy("createdAt", "desc")
+        .limit(5)
+        .get();
+
+      if (noticesSnapshot.empty) {
+        return { success: true, notices: [] };
+      }
+
+      const notices = noticesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Firestore Timestamp를 ISO 문자열로 변환
+        createdAt: doc.data().createdAt.toDate().toISOString(),
+      }));
+
+      return { success: true, notices: notices };
+    } catch (error) {
+      console.error("최신 공지사항 조회 오류:", error);
+      throw new functions.https.HttpsError("internal", "최신 공지사항을 불러오는 중 오류가 발생했습니다.");
+    }
+  });
