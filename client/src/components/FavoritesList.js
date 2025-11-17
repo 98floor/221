@@ -6,7 +6,7 @@ import { Box, Typography, Table, TableContainer, TableBody, TableCell, TableHead
 import { onAuthStateChanged } from 'firebase/auth';
 
 // 헬퍼 함수
-const getColor = (num) => (num > 0 ? 'green' : num < 0 ? 'red' : 'black');
+const getColor = (num) => (num > 0 ? 'red' : num < 0 ? 'blue' : 'black');
 const formatPercent = (num) => (num || num === 0 ? `${num.toFixed(2)}%` : '-');
 const formatPrice = (num) => (num || num === 0 ? `${Math.round(num).toLocaleString('ko-KR')}` : '-');
 

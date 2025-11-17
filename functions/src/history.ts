@@ -42,6 +42,13 @@ export const recordPortfolioHistory = functions
         .collection("holdings")
         .get();
 
+      // [신규] 시즌 마감으로 인한 자산 초기화 이벤트는 기록하지 않도록 처리
+      // (초기 자본금과 정확히 일치하고, 보유 주식이 없는 경우)
+      if (userCash === INITIAL_CAPITAL && holdingsSnapshot.empty) {
+        console.log(`Season reset detected for user ${userId}. Skipping portfolio history record.`);
+        return null; // 이 이벤트 기록을 건너뜀
+      }
+
       let totalHoldingsValue = 0;
       if (!holdingsSnapshot.empty) {
         const holdingPromises = holdingsSnapshot.docs.map(async (doc) => {

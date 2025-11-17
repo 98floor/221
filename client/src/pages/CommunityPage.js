@@ -6,8 +6,34 @@ import './CommunityPage.css';
 
 const Badge = ({ badge }) => {
   if (!badge) return null;
-  const badgeClass = `badge badge-${badge.toLowerCase()}`;
-  return <span className={badgeClass}>{badge}</span>;
+
+  // 한글 뱃지 이름을 영문 클래스 이름으로 매핑
+  const getBadgeClass = (badgeName) => {
+    switch (badgeName) {
+      case "실버":
+        return "badge-silver";
+      case "골드":
+        return "badge-gold";
+      case "마스터":
+        return "badge-master";
+      default:
+        return "";
+    }
+  };
+
+  const badgeClass = `badge ${getBadgeClass(badge)}`;
+  
+  // 뱃지 텍스트는 영문으로 표시
+  const getBadgeText = (badgeName) => {
+    switch (badgeName) {
+      case "실버": return "Silver";
+      case "골드": return "Gold";
+      case "마스터": return "Master";
+      default: return badgeName;
+    }
+  }
+
+  return <span className={badgeClass}>{getBadgeText(badge)}</span>;
 };
 
 function CommunityPage() {
@@ -77,9 +103,9 @@ function CommunityPage() {
             <table className="posts-table">
               <thead>
                 <tr>
-                  <th style={{ width: '50%' }}>제목</th>
-                  <th>작성자</th>
-                  <th style={{ width: '20%' }}>작성 시간</th>
+                  <th className="col-title">제목</th>
+                  <th className="col-author">작성자</th>
+                  <th className="col-date">작성 시간</th>
                 </tr>
               </thead>
               <tbody>
@@ -89,9 +115,9 @@ function CommunityPage() {
                       onClick={() => handleRowClick(post.id)} 
                       className={selectedPostId === post.id ? 'active-post-row' : ''}
                     >
-                      <td>{post.title}</td>
-                      <td>{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
-                      <td>{formatDate(post.created_at)}</td>
+                      <td className="col-title">{post.title}</td>
+                      <td className="col-author">{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
+                      <td className="col-date">{formatDate(post.created_at)}</td>
                     </tr>
                     {selectedPostId === post.id && (
                       <tr>
