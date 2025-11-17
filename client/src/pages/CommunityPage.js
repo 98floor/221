@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db, functions } from '../firebase';
-import { httpsCallable } from 'firebase/functions';
+import { Link } from 'react-router-dom';
+import { db } from '../firebase';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import './CommunityPage.css';
 
@@ -11,14 +11,12 @@ const Badge = ({ badge }) => {
 };
 
 function CommunityPage() {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [posts, setPosts] = useState([]);
   const [selectedPostId, setSelectedPostId] = useState(null);
-  const [loadingWrite, setLoadingWrite] = useState(false);
   const [loadingRead, setLoadingRead] = useState(true);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const postsPerPage = 10;
 
   const formatDate = (timestamp) => {
     if (timestamp) return timestamp.toDate().toLocaleString('ko-KR');
@@ -44,85 +42,78 @@ function CommunityPage() {
     setSelectedPostId(selectedPostId === postId ? null : postId);
   };
 
-  const handleWritePost = async (e) => {
-    e.preventDefault();
-    if (title.trim() === '' || content.trim() === '') {
-      setMessage('제목과 내용을 모두 입력해주세요.');
-      return;
-    }
-    setLoadingWrite(true);
-    setMessage('');
-    try {
-      const createPost = httpsCallable(functions, 'createPost');
-      const result = await createPost({ title, content });
-      setMessage(result.data.message);
-      setTitle('');
-      setContent('');
-      fetchPosts();
-    } catch (err) {
-      console.error("게시글 작성 실패:", err);
-      setMessage(`작성 실패: ${err.message}`);
-    } finally {
-      setLoadingWrite(false);
-    }
-  };
-
   useEffect(() => {
     fetchPosts();
   }, []);
 
+  // Pagination logic
+  const indexOfLastPost = currentPage * postsPerPage;
+  const indexOfFirstPost = indexOfLastPost - postsPerPage;
+  const currentPosts = posts.slice(indexOfFirstPost, indexOfLastPost);
+  const totalPages = Math.ceil(posts.length / postsPerPage);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
     <div className="community-container">
       <div className="community-header">
-        <h2>매매 전략 게시판</h2>
-      </div>
-
-      <div className="post-form-container">
-        <h3>새 글 작성</h3>
-        <form onSubmit={handleWritePost}>
-          <div className="form-group">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목" />
-          </div>
-          <div className="form-group">
-            <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="내용" />
-          </div>
-          <button type="submit" disabled={loadingWrite}>
-            {loadingWrite ? '등록 중...' : '글 등록'}
-          </button>
-          {message && <p className={message.includes('실패') ? 'error-message' : 'success-message'}>{message}</p>}
-        </form>
+        <h2>게시글 목록</h2>
+        <Link to="/write-post" className="write-post-link">글 작성</Link>
       </div>
 
       <div className="posts-list-container">
-        <h3>게시글 목록</h3>
         {loadingRead ? <p>글 목록을 불러오는 중...</p> : error ? <p className="error-message">오류: {error}</p> : posts.length > 0 ? (
-          <table className="posts-table">
-            <thead>
-              <tr>
-                <th style={{ width: '50%' }}>제목</th>
-                <th>작성자</th>
-                <th style={{ width: '20%' }}>작성 시간</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posts.map((post) => (
-                <React.Fragment key={post.id}>
-                  <tr onClick={() => handleRowClick(post.id)} style={{ cursor: 'pointer' }}>
-                    <td>{post.title}</td>
-                    <td>{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
-                    <td>{formatDate(post.created_at)}</td>
-                  </tr>
-                  {selectedPostId === post.id && (
-                    <tr>
-                      <td colSpan="3" className="post-content">
-                        {post.content}
-                      </td>
+          <>
+            <table className="posts-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '50%' }}>제목</th>
+                  <th>작성자</th>
+                  <th style={{ width: '20%' }}>작성 시간</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentPosts.map((post) => (
+                  <React.Fragment key={post.id}>
+                    <tr 
+                      onClick={() => handleRowClick(post.id)} 
+                      className={selectedPostId === post.id ? 'active-post-row' : ''}
+                    >
+                      <td>{post.title}</td>
+                      <td>{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
+                      <td>{formatDate(post.created_at)}</td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {selectedPostId === post.id && (
+                      <tr>
+                        <td colSpan="3" className="post-content">
+                          {post.content}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+            <div className="pagination-container">
+              <button onClick={handlePrevPage} disabled={currentPage === 1}>
+                이전
+              </button>
+              <span>{currentPage} / {totalPages}</span>
+              <button onClick={handleNextPage} disabled={currentPage === totalPages}>
+                다음
+              </button>
+            </div>
+          </>
         ) : (
           <p>작성된 게시글이 없습니다.</p>
         )}

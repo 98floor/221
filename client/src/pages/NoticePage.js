@@ -50,13 +50,34 @@ const NoticeForm = ({ onPostCreated }) => {
   );
 };
 
-const NoticeItem = ({ notice }) => {
+const NoticeItem = ({ notice, role, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const handleDelete = async (e) => {
+    e.stopPropagation(); // Prevent the accordion from toggling
+    if (!window.confirm(`'${notice.title}' 공지를 정말로 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      const deleteNoticeFunc = httpsCallable(functions, 'deleteNotice');
+      await deleteNoticeFunc({ noticeId: notice.id });
+      onDelete(); // Refresh the list
+    } catch (err) {
+      console.error("Error deleting notice:", err);
+      alert(`삭제 실패: ${err.message}`);
+    }
+  };
+
   return (
     <div className="notice-item">
       <div className="notice-item-header" onClick={() => setIsOpen(!isOpen)}>
         <h4>{notice.title}</h4>
-        <span className="notice-item-meta">작성일: {notice.createdAt}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span className="notice-item-meta">작성일: {notice.createdAt}</span>
+          {role === 'admin' && (
+            <button onClick={handleDelete} className="btn-danger">삭제</button>
+          )}
+        </div>
       </div>
       {isOpen && (
         <div className="notice-item-content">
@@ -108,7 +129,7 @@ function NoticePage() {
       {error && <p className="error-message">{error}</p>}
       {!loading && notices.length === 0 && <p>등록된 공지사항이 없습니다.</p>}
       <div className="notice-list">
-        {notices.map(notice => <NoticeItem key={notice.id} notice={notice} />)}
+        {notices.map(notice => <NoticeItem key={notice.id} notice={notice} role={role} onDelete={fetchNotices} />)}
       </div>
     </div>
   );

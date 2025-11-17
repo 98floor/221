@@ -194,7 +194,7 @@ function AdminPage() {
               {users.map(u => (
                 <tr key={u.uid}>
                   <td>{u.email}</td><td>{u.uid}</td><td style={{ color: u.disabled ? 'red' : 'green' }}>{u.disabled ? '정지됨' : '활성'}</td>
-                  <td>{u.disabled ? <button onClick={() => handleToggleSuspension(u.uid, false)}>활성화</button> : <button onClick={() => handleToggleSuspension(u.uid, true)}>정지</button>}</td>
+                  <td>{u.disabled ? <button onClick={() => handleToggleSuspension(u.uid, false)} className="btn-success">활성화</button> : <button onClick={() => handleToggleSuspension(u.uid, true)} className="btn-danger">정지</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -205,7 +205,7 @@ function AdminPage() {
       <AdminSection title="게시물 관리">
         {postMessage && <p>{postMessage}</p>}
         {loadingPosts ? <p>게시물 로딩 중...</p> : (
-          <ul className="admin-list">{posts.map(p => (<li key={p.id}>"{p.title}" <button onClick={() => handleDeletePost(p.id)}>삭제</button></li>))}</ul>
+          <ul className="admin-list">{posts.map(p => (<li key={p.id}>"{p.title}" <button onClick={() => handleDeletePost(p.id)} className="btn-danger">삭제</button></li>))}</ul>
         )}
       </AdminSection>
 
@@ -219,7 +219,7 @@ function AdminPage() {
           </select>
           <button type="submit">퀴즈 생성</button>
         </form>
-        {loadingQuizzes ? <p>퀴즈 로딩 중...</p> : (<ul className="admin-list">{quizzes.map(q => (<li key={q.id}>"{q.question}" <button onClick={() => handleDeleteQuiz(q.id)}>삭제</button></li>))}</ul>)}
+        {loadingQuizzes ? <p>퀴즈 로딩 중...</p> : (<ul className="admin-list">{quizzes.map(q => (<li key={q.id}>"{q.question}" <button onClick={() => handleDeleteQuiz(q.id)} className="btn-danger">삭제</button></li>))}</ul>)}
       </AdminSection>
 
       <AdminSection title="O/X 예측 관리">
@@ -229,7 +229,7 @@ function AdminPage() {
           <button type="submit">예측 생성</button>
         </form>
         {loadingDebates ? <p>예측 로딩 중...</p> : (
-          <ul className="admin-list">{debates.map(d => (<li key={d.id}>"{d.topic}" <span style={{ color: d.status === 'closed' ? 'blue' : 'green' }}>({d.status === 'closed' ? `마감됨 - 정답: ${d.correctAnswer}` : '진행중'})</span> {d.status !== 'closed' && (<button onClick={() => handleCloseDebate(d.id)}>마감</button>)} <button onClick={() => handleDeleteDebate(d.id)}>삭제</button></li>))}</ul>
+          <ul className="admin-list">{debates.map(d => (<li key={d.id}>"{d.topic}" <span style={{ color: d.status === 'closed' ? 'blue' : 'green' }}>({d.status === 'closed' ? `마감됨 - 정답: ${d.correctAnswer}` : '진행중'})</span> {d.status !== 'closed' && (<button onClick={() => handleCloseDebate(d.id)} className="btn-secondary">마감</button>)} <button onClick={() => handleDeleteDebate(d.id)} className="btn-danger">삭제</button></li>))}</ul>
         )}
       </AdminSection>
 
@@ -247,7 +247,7 @@ function AdminPage() {
         <hr />
         <h4>과거 시즌 삭제</h4>
         {loadingSeason ? <p>시즌 목록 로딩 중...</p> : (
-          <ul className="admin-list">{pastSeasons.map(season => (<li key={season.id}><span>{season.name}</span><button onClick={() => handleDeleteSeason(season.id)} disabled={loadingSeason} className="danger-button">{loadingSeason ? '처리 중...' : `시즌 ${season.id} 삭제`}</button></li>))}</ul>
+          <ul className="admin-list">{pastSeasons.map(season => (<li key={season.id}><span>{season.name}</span><button onClick={() => handleDeleteSeason(season.id)} disabled={loadingSeason} className="btn-danger">{loadingSeason ? '처리 중...' : `시즌 ${season.id} 삭제`}</button></li>))}</ul>
         )}
       </AdminSection>
     </div>

@@ -68,3 +68,53 @@
 .danger-zone .admin-section-header {
   background-color: #f5b7b1;
 }
+
+/* Button overrides for Admin Page */
+.admin-table button,
+.admin-list button {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  margin: 0 2px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  color: white; /* Ensure text is white */
+}
+
+.admin-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-list li:last-child {
+  border-bottom: none;
+}
+
+.admin-list button {
+  margin-left: 5px;
+}
+
+
+.btn-danger {
+  background-color: #e74c3c;
+}
+.btn-danger:hover {
+  background-color: #c0392b;
+}
+
+.btn-success {
+  background-color: #2ecc71;
+}
+.btn-success:hover {
+  background-color: #27ae60;
+}
+
+.btn-secondary {
+  background-color: #95a5a6;
+}
+.btn-secondary:hover {
+  background-color: #7f8c8d;
+}

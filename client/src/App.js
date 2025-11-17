@@ -27,6 +27,7 @@ import AdminPage from './pages/AdminPage';
 import NoticePage from './pages/NoticePage'; 
 import PasswordResetPage from './pages/PasswordResetPage';
 import QuestPage from './pages/QuestPage'; // [신규] 퀘스트 페이지 임포트
+import PostWritePage from './pages/PostWritePage';
 
 // [신규] App 컴포넌트의 내용을 분리 (useLocation 훅을 사용하기 위함)
 function AppContent() {
@@ -188,6 +189,14 @@ function AppContent() {
           <Route path="/ranking" element={<RankingPage />} />
           <Route path="/hall-of-fame" element={<HallOfFamePage />} />
           <Route path="/community" element={<CommunityPage />} />
+          <Route 
+            path="/write-post" 
+            element={
+              <ProtectedRoute>
+                <PostWritePage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/debate" element={<DebatePage />} />
           <Route path="/quiz" element={<QuizPage />} />
           <Route path="/quest" element={<QuestPage />} /> {/* [신규] 퀘스트 라우트 추가 */}

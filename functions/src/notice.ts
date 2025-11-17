@@ -77,3 +77,43 @@ export const getRecentNotices = functions
       throw new functions.https.HttpsError("internal", "최신 공지사항을 불러오는 중 오류가 발생했습니다.");
     }
   });
+
+export const deleteNotice = functions
+  .region("asia-northeast3")
+  .https.onCall(async (data, context) => {
+    // 1. Check if user is an admin
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Authentication is required to perform this action."
+      );
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== "admin") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only admins can delete notices."
+      );
+    }
+
+    // 2. Validate the input data
+    const { noticeId } = data;
+    if (!noticeId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "The function must be called with one argument 'noticeId'."
+      );
+    }
+
+    // 3. Delete the notice document from Firestore
+    try {
+      await db.collection("notices").doc(noticeId).delete();
+      return { success: true, message: "Notice deleted successfully." };
+    } catch (error) {
+      console.error("Error deleting notice:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "An error occurred while trying to delete the notice."
+      );
+    }
+  });
