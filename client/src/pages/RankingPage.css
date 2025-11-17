@@ -24,6 +24,7 @@
   background-color: transparent;
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
+  color: var(--text-secondary);
 }
 
 .ranking-tab-active {

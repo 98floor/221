@@ -14,6 +14,7 @@ function CommunityPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [posts, setPosts] = useState([]);
+  const [selectedPostId, setSelectedPostId] = useState(null);
   const [loadingWrite, setLoadingWrite] = useState(false);
   const [loadingRead, setLoadingRead] = useState(true);
   const [message, setMessage] = useState('');
@@ -37,6 +38,10 @@ function CommunityPage() {
     } finally {
       setLoadingRead(false);
     }
+  };
+
+  const handleRowClick = (postId) => {
+    setSelectedPostId(selectedPostId === postId ? null : postId);
   };
 
   const handleWritePost = async (e) => {
@@ -101,11 +106,20 @@ function CommunityPage() {
             </thead>
             <tbody>
               {posts.map((post) => (
-                <tr key={post.id}>
-                  <td>{post.title}</td>
-                  <td>{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
-                  <td>{formatDate(post.created_at)}</td>
-                </tr>
+                <React.Fragment key={post.id}>
+                  <tr onClick={() => handleRowClick(post.id)} style={{ cursor: 'pointer' }}>
+                    <td>{post.title}</td>
+                    <td>{post.nickname || '알 수 없음'}<Badge badge={post.badge} /></td>
+                    <td>{formatDate(post.created_at)}</td>
+                  </tr>
+                  {selectedPostId === post.id && (
+                    <tr>
+                      <td colSpan="3" className="post-content">
+                        {post.content}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
