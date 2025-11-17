@@ -37,28 +37,30 @@ const PasswordResetPage = () => {
   };
 
   return (
-    <div className="form-container">
-      <form onSubmit={handleSubmit}>
-        <h2>비밀번호 찾기</h2>
-        <p style={{ marginBottom: '20px', fontSize: '15px', color: '#666' }}>
-          가입 시 사용한 이메일 주소를 입력하시면, 비밀번호 재설정 링크를 보내드립니다.
-        </p>
-        {message && <p className="success-message">{message}</p>}
-        {error && <p className="error-message">{error}</p>}
-        <div className="form-group">
-          <label htmlFor="email">이메일</label>
-          <input
-            type="email"
-            id="email"
-            placeholder="이메일을 입력하세요"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="form-button">재설정 이메일 보내기</button>
-        <Link to="/login" className="form-link">로그인 페이지로 돌아가기</Link>
-      </form>
+    <div className="form-page-wrapper">
+      <div className="form-container">
+        <form onSubmit={handleSubmit}>
+          <h2>비밀번호 찾기</h2>
+          <p style={{ marginBottom: '20px', fontSize: '15px', color: '#666' }}>
+            가입 시 사용한 이메일 주소를 입력하시면, 비밀번호 재설정 링크를 보내드립니다.
+          </p>
+          {message && <p className="success-message">{message}</p>}
+          {error && <p className="error-message">{error}</p>}
+          <div className="form-group">
+            <label htmlFor="email">이메일</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="이메일을 입력하세요"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="form-button">재설정 이메일 보내기</button>
+          <Link to="/login" className="form-link">로그인 페이지로 돌아가기</Link>
+        </form>
+      </div>
     </div>
   );
 };

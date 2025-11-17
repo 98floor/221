@@ -99,62 +99,64 @@ function RegisterPage() {
   };
 
   return (
-    <div className="form-container">
-      <form onSubmit={handleRegister}>
-        <h2>회원가입</h2>
-        {error && <p className="error-message">{error}</p>}
-        
-        <div className="form-group">
-          <label htmlFor="email">학교 웹메일 (.ac.kr)</label>
-          <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="password">비밀번호</label>
-          <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="passwordConfirm">비밀번호 확인</label>
-          <input type="password" id="passwordConfirm" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="nickname">닉네임</label>
-          <div style={{ display: 'flex' }}>
-            <input type="text" id="nickname" value={nickname} onChange={handleNicknameChange} required />
-            <button type="button" onClick={handleNicknameCheck} style={{ marginLeft: '10px', whiteSpace: 'nowrap' }}>중복 확인</button>
+    <div className="form-page-wrapper">
+      <div className="form-container">
+        <form onSubmit={handleRegister}>
+          <h2>회원가입</h2>
+          {error && <p className="error-message">{error}</p>}
+          
+          <div className="form-group">
+            <label htmlFor="email">학교 웹메일 (.ac.kr)</label>
+            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
-          {nicknameMessage && <p style={{ color: isNicknameAvailable ? 'green' : 'red', marginTop: '5px' }}>{nicknameMessage}</p>}
-        </div>
 
-        <div className="form-group">
-          <label htmlFor="region">지역</label>
-          <select id="region" value={selectedRegion} onChange={handleRegionChange} required>
-            <option value="" disabled>지역을 선택하세요</option>
-            {Object.keys(universities).filter(region => region !== 'default').map(region => (
-              <option key={region} value={region}>{region}</option>
-            ))}
-          </select>
-        </div>
+          <div className="form-group">
+            <label htmlFor="password">비밀번호</label>
+            <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="schoolName">소속 대학</label>
-          <select id="schoolName" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} required disabled={!selectedRegion}>
-            <option value="" disabled>대학을 선택하세요</option>
-            {selectedRegion && universities[selectedRegion] && universities[selectedRegion].map(uni => (
-              <option key={uni} value={uni}>{uni}</option>
-            ))}
-          </select>
-        </div>
+          <div className="form-group">
+            <label htmlFor="passwordConfirm">비밀번호 확인</label>
+            <input type="password" id="passwordConfirm" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required />
+          </div>
 
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
-          <input type="checkbox" id="isStudentChecked" checked={isStudentChecked} onChange={(e) => setIsStudentChecked(e.target.checked)} style={{ width: 'auto', marginRight: '10px' }} />
-          <label htmlFor="isStudentChecked" style={{ marginBottom: 0, fontSize: '14px', whiteSpace: 'nowrap' }}>본인은 현재 재학 중인 대학생/대학원생이 맞습니다.</label>
-        </div>
+          <div className="form-group">
+            <label htmlFor="nickname">닉네임</label>
+            <div style={{ display: 'flex' }}>
+              <input type="text" id="nickname" value={nickname} onChange={handleNicknameChange} required />
+              <button type="button" onClick={handleNicknameCheck} style={{ marginLeft: '10px', whiteSpace: 'nowrap' }}>중복 확인</button>
+            </div>
+            {nicknameMessage && <p style={{ color: isNicknameAvailable ? 'green' : 'red', marginTop: '5px' }}>{nicknameMessage}</p>}
+          </div>
 
-        <button type="submit" className="form-button">인증메일 발송 (회원가입)</button>
-      </form>
+          <div className="form-group">
+            <label htmlFor="region">지역</label>
+            <select id="region" value={selectedRegion} onChange={handleRegionChange} required>
+              <option value="" disabled>지역을 선택하세요</option>
+              {Object.keys(universities).filter(region => region !== 'default').map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="schoolName">소속 대학</label>
+            <select id="schoolName" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} required disabled={!selectedRegion}>
+              <option value="" disabled>대학을 선택하세요</option>
+              {selectedRegion && universities[selectedRegion] && universities[selectedRegion].map(uni => (
+                <option key={uni} value={uni}>{uni}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+            <input type="checkbox" id="isStudentChecked" checked={isStudentChecked} onChange={(e) => setIsStudentChecked(e.target.checked)} style={{ width: 'auto', marginRight: '10px' }} />
+            <label htmlFor="isStudentChecked" style={{ marginBottom: 0, fontSize: '14px', whiteSpace: 'nowrap' }}>본인은 현재 재학 중인 대학생/대학원생이 맞습니다.</label>
+          </div>
+
+          <button type="submit" className="form-button">인증메일 발송 (회원가입)</button>
+        </form>
+      </div>
     </div>
   );
 }

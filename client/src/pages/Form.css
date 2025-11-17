@@ -1,16 +1,31 @@
+/* client/src/pages/Form.css */
+
+/* 페이지 전체를 감싸는 래퍼 추가 */
+.form-page-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 200px); /* 헤더/푸터 높이를 고려한 최소 높이 */
+  padding: 20px;
+}
+
 .form-container {
-  max-width: 700px; /* 너비 확장 */
-  margin: 50px auto;
+  width: 100%;
+  max-width: 450px; /* 가독성을 위해 너비 축소 */
+  margin: 0 auto;
   padding: 40px;
-  background-color: var(--container-bg-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  background-color: var(--surface-color, #ffffff);
+  border-radius: var(--border-radius, 8px);
+  box-shadow: var(--shadow-md, 0 4px 8px rgba(0,0,0,0.1));
+  border: 1px solid var(--divider-color, #eeeeee);
 }
 
 .form-container h2 {
   text-align: center;
   margin-bottom: 30px;
-  color: var(--text-color);
+  color: var(--text-primary, #333333);
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .form-group {
@@ -22,73 +37,101 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #555;
+  color: var(--text-secondary, #777777);
+  font-size: 14px;
 }
 
+/* 모든 input과 select에 일관된 스타일 적용 */
 .form-container input[type="text"],
+.form-container input[type="email"],
+.form-container input[type="password"],
+.form-container select,
 .form-container textarea {
   width: 100%;
   padding: 12px 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border: 1px solid var(--divider-color, #eeeeee);
+  border-radius: var(--border-radius, 8px);
   font-size: 16px;
-  transition: border-color 0.3s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  background-color: var(--background-color, #f4f7f9);
 }
 
 .form-container textarea {
-  min-height: 200px;
+  min-height: 150px;
   resize: vertical;
   font-family: inherit;
 }
 
+/* 모든 input과 select에 일관된 포커스 스타일 적용 */
 .form-container input[type="text"]:focus,
+.form-container input[type="email"]:focus,
+.form-container input[type="password"]:focus,
+.form-container select:focus,
 .form-container textarea:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: var(--primary-color, #4a90e2);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2); /* 포커스 시 테두리 효과 */
 }
 
-.form-container button {
+/* 버튼 스타일 일관성 유지 */
+.form-container .form-button {
   width: 100%;
   padding: 12px;
   font-size: 18px;
   font-weight: 600;
   margin-top: 10px;
   cursor: pointer;
-  background-color: var(--primary-color);
+  background-color: var(--primary-color, #4a90e2);
   color: white;
   border: none;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  border-radius: var(--border-radius, 8px);
+  transition: background-color 0.3s, transform 0.2s;
 }
 
-.form-container button:hover:not(:disabled) {
-  background-color: var(--primary-hover-color);
+.form-container .form-button:hover:not(:disabled) {
+  background-color: #357abd; /* App.css의 primary-color에 맞춘 hover 색상 */
+  transform: translateY(-2px);
 }
 
-.form-container button:disabled {
+.form-container .form-button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .form-link {
   margin-top: 20px;
   display: block;
-  color: var(--primary-color);
+  color: var(--primary-color, #4a90e2);
   font-size: 14px;
   text-align: center;
+  text-decoration: none;
+  transition: color 0.3s;
 }
 
+.form-link:hover {
+  text-decoration: underline;
+  color: #357abd;
+}
+
+/* 메시지 스타일 개선 */
 .error-message,
 .success-message {
   margin-top: 15px;
+  padding: 10px;
+  border-radius: var(--border-radius, 8px);
   font-size: 14px;
   text-align: center;
 }
 
 .error-message {
-  color: #e74c3c;
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
 }
 
 .success-message {
-  color: #2ecc71;
+  color: #155724;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
 }

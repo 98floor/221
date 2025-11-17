@@ -21,7 +21,7 @@ function LoginPage() {
       const user = userCredential.user;
 
       if (!user.emailVerified) {
-        setError("이메일 인증이 완료되지 않았습니다. 메일함에서 인증 링크를 클릭해주세요.");
+        setError("이메일 인증이 완료되지 않았습니다.");
         await auth.signOut();
         return;
       }
@@ -52,38 +52,40 @@ function LoginPage() {
   };
 
   return (
-    <div className="form-container">
-      <form onSubmit={handleLogin}>
-        <h2>로그인</h2>
-        {error && <p className="error-message">{error}</p>}
-        <div className="form-group">
-          <label htmlFor="email">이메일</label>
-          <input
-            type="email"
-            id="email"
-            placeholder="이메일을 입력하세요"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="password">비밀번호</label>
-          <input
-            type="password"
-            id="password"
-            placeholder="비밀번호를 입력하세요"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="form-button">로그인</button>
-        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '20px' }}>
-          <Link to="/register" className="form-link" style={{ marginTop: 0 }}>회원가입</Link>
-          <Link to="/password-reset" className="form-link" style={{ marginTop: 0 }}>비밀번호 찾기</Link>
-        </div>
-      </form>
+    <div className="form-page-wrapper">
+      <div className="form-container">
+        <form onSubmit={handleLogin}>
+          <h2>로그인</h2>
+          {error && <p className="error-message">{error}</p>}
+          <div className="form-group">
+            <label htmlFor="email">이메일</label>
+            <input
+              type="email"
+              id="email"
+              placeholder="이메일을 입력하세요"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">비밀번호</label>
+            <input
+              type="password"
+              id="password"
+              placeholder="비밀번호를 입력하세요"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="form-button">로그인</button>
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '20px' }}>
+            <Link to="/register" className="form-link" style={{ marginTop: 0 }}>회원가입</Link>
+            <Link to="/password-reset" className="form-link" style={{ marginTop: 0 }}>비밀번호 찾기</Link>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

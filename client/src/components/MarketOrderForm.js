@@ -113,19 +113,21 @@ function OrderForm({ symbol, stockInfo }) {
 
   // [신규] 비율 버튼 클릭 핸들러
   const handlePercentClick = (percent) => {
-    const TRADE_FEE_RATE = 0.0025; // 수수료 (0.25%)
-    let newAmount = 0;
-    if (tabIndex === 0) {
-      // '매수' 탭: 수수료를 고려한 최대 매수 가능 금액 계산
+    if (tabIndex === 0) { // 매수
+      const TRADE_FEE_RATE = 0.0025;
       const maxAmount = availableCash / (1 + TRADE_FEE_RATE);
-      newAmount = maxAmount * percent;
-    } else {
-      // '매도' 탭: 총 평가액 (보유수량 * 현재가) 기준
-      const maxAmount = heldQuantity * currentPrice;
-      newAmount = maxAmount * percent;
+      const newAmount = maxAmount * percent;
+      handleAmountChange(formatAmount(newAmount));
+    } else { // 매도
+      // [수정] 부동소수점 오류를 피하기 위해 수량을 직접 계산
+      const newQuantity = heldQuantity * percent;
+      // 100% 매도 시, API에 저장된 정확한 보유 수량 값을 그대로 사용
+      if (percent === 1.0) {
+        handleQuantityChange(heldQuantity.toString());
+      } else {
+        handleQuantityChange(truncateQuantity(newQuantity));
+      }
     }
-    // 금액 입력을 기준으로 수량까지 자동 변경
-    handleAmountChange(formatAmount(newAmount)); 
   };
   // --- 핸들러 끝 ---
 

@@ -105,7 +105,7 @@ function AppContent() {
                     to={link.path}
                     sx={{ 
                       color: 'black', 
-                      marginX: 0.5,
+                      marginX: 1.5,
                       flexShrink: 0, 
                     }}
                   >
