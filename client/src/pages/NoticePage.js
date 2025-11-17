@@ -1,11 +1,10 @@
-// client/src/pages/NoticePage.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { db, functions } from '../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../hooks/useAuth';
+import './NoticePage.css';
 
-// 관리자용 공지 작성 폼
 const NoticeForm = ({ onPostCreated }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -26,9 +25,7 @@ const NoticeForm = ({ onPostCreated }) => {
       setTitle('');
       setContent('');
       setMessage('공지사항이 성공적으로 등록되었습니다.');
-      if (onPostCreated) {
-        onPostCreated(); // 부모 컴포넌트에 다시 로드하라고 알림
-      }
+      if (onPostCreated) onPostCreated();
     } catch (err) {
       setMessage(`오류: ${err.message}`);
     } finally {
@@ -37,32 +34,40 @@ const NoticeForm = ({ onPostCreated }) => {
   };
 
   return (
-    <div style={{ border: '2px solid #1976d2', padding: '16px', marginBottom: '32px' }}>
+    <div className="notice-form-container">
       <h3>새 공지사항 작성</h3>
       <form onSubmit={handleCreatePost}>
-        <input
-          type="text"
-          placeholder="제목"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
-        />
-        <textarea
-          placeholder="내용"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          style={{ width: '100%', height: '150px', padding: '8px', marginBottom: '10px' }}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? '등록 중...' : '등록하기'}
-        </button>
+        <div className="form-group">
+          <input type="text" placeholder="제목" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <textarea placeholder="내용" value={content} onChange={(e) => setContent(e.target.value)} />
+        </div>
+        <button type="submit" disabled={loading}>{loading ? '등록 중...' : '등록하기'}</button>
       </form>
-      {message && <p>{message}</p>}
+      {message && <p className={message.includes('오류') ? 'error-message' : 'success-message'}>{message}</p>}
     </div>
   );
 };
 
-// 공지사항 목록
+const NoticeItem = ({ notice }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="notice-item">
+      <div className="notice-item-header" onClick={() => setIsOpen(!isOpen)}>
+        <h4>{notice.title}</h4>
+        <span className="notice-item-meta">작성일: {notice.createdAt}</span>
+      </div>
+      {isOpen && (
+        <div className="notice-item-content">
+          <p>{notice.content}</p>
+          <small>작성자: {notice.author}</small>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function NoticePage() {
   const { role } = useAuth();
   const [notices, setNotices] = useState([]);
@@ -94,30 +99,20 @@ function NoticePage() {
   }, [fetchNotices]);
 
   return (
-    <div>
-      <h2>공지사항</h2>
-      
-      {/* 관리자인 경우에만 작성 폼을 보여줌 */}
+    <div className="notice-container">
+      <div className="notice-header">
+        <h2>공지사항</h2>
+      </div>
       {role === 'admin' && <NoticeForm onPostCreated={fetchNotices} />}
-
       {loading && <p>공지사항을 불러오는 중...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      
+      {error && <p className="error-message">{error}</p>}
       {!loading && notices.length === 0 && <p>등록된 공지사항이 없습니다.</p>}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {notices.map(notice => (
-          <div key={notice.id} style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '4px' }}>
-            <h3 style={{ marginTop: 0 }}>{notice.title}</h3>
-            <p style={{ whiteSpace: 'pre-wrap' }}>{notice.content}</p>
-            <small>
-              작성자: {notice.author} | 작성일: {notice.createdAt}
-            </small>
-          </div>
-        ))}
+      <div className="notice-list">
+        {notices.map(notice => <NoticeItem key={notice.id} notice={notice} />)}
       </div>
     </div>
   );
 }
 
 export default NoticePage;
+

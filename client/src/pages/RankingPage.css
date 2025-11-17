@@ -1,0 +1,63 @@
+.ranking-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.ranking-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.ranking-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.ranking-tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 500;
+  border: none;
+  background-color: transparent;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.ranking-tab-active {
+  border-bottom-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.ranking-table-container {
+  background-color: var(--container-bg-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.ranking-table th, .ranking-table td {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-table thead th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.ranking-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ranking-table tbody tr:hover {
+  background-color: #f1f3f5;
+}

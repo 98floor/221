@@ -1,88 +1,87 @@
-// client/src/pages/LoginPage.js
 import React, { useState } from 'react';
 import { auth, db, functions } from '../firebase';
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from 'firebase/functions';
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { Link, useNavigate } from 'react-router-dom'; 
+import { Link, useNavigate } from 'react-router-dom';
+import './Form.css';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate(); 
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+
     try {
-      // 1. Firebase Auth 로그인 시도
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. 이메일 인증 여부 확인
       if (!user.emailVerified) {
-        alert("이메일 인증이 완료되지 않았습니다. 메일함에서 인증 링크를 클릭해주세요.");
-        await auth.signOut(); 
+        setError("이메일 인증이 완료되지 않았습니다. 메일함에서 인증 링크를 클릭해주세요.");
+        await auth.signOut();
         return;
       }
 
-      // 3. Firestore 'users' DB에서 프로필 상태 확인
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        throw new Error("데이터베이스에 사용자 프로필이 없습니다. 회원가입을 다시 진행해주세요.");
+        throw new Error("데이터베이스에 사용자 프로필이 없습니다.");
       }
 
       const userData = userDoc.data();
 
-      // 4. 'pending_verification' (인증 대기) 상태인지 확인
       if (userData.status === "pending_verification") {
-        // 4-1. 계정 활성화 Cloud Function 호출
-        // alert("이메일 인증이 확인되었습니다. 계정을 활성화하고 초기 자본 1,000만원을 지급합니다.");
-
         const activateAccount = httpsCallable(functions, 'activateAccount');
         const result = await activateAccount();
-
-        // 서버의 최종 결과 알림(2번째)만 남김
-        alert(result.data.message); // "계정이 활성화되었습니다..."
-
+        alert(result.data.message);
       } else {
-        // 4-2. (이미 'active' 상태)
         alert("로그인 성공!");
       }
 
-      // 5. 모든 과정 완료 후, 홈 페이지로 이동
       navigate('/');
 
     } catch (error) {
       console.error("로그인 실패:", error);
-      alert("로그인 실패: " + error.message);
+      setError("로그인에 실패했습니다. 이메일 또는 비밀번호를 확인해주세요.");
     }
   };
 
   return (
-    <div>
-      <h2>로그인 (UC-2)</h2>
-      <input
-        type="email"
-        placeholder="이메일"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <br />
-      <input
-        type="password"
-        placeholder="비밀번호"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <br />
-      <button onClick={handleLogin}>로그인</button>
-      <Link to="/password-reset">
-        <button>비밀번호 찾기</button>
-      </Link>
-      <Link to="/register">
-        <button>회원가입</button>
-      </Link>
+    <div className="form-container">
+      <form onSubmit={handleLogin}>
+        <h2>로그인</h2>
+        {error && <p className="error-message">{error}</p>}
+        <div className="form-group">
+          <label htmlFor="email">이메일</label>
+          <input
+            type="email"
+            id="email"
+            placeholder="이메일을 입력하세요"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="password">비밀번호</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="비밀번호를 입력하세요"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit" className="form-button">로그인</button>
+        <Link to="/password-reset" className="form-link">비밀번호 찾기</Link>
+        <Link to="/register" className="form-link">회원가입</Link>
+      </form>
     </div>
   );
 }

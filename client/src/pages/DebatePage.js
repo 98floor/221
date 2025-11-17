@@ -1,35 +1,43 @@
-// client/src/pages/DebatePage.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { db, functions } from '../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../hooks/useAuth';
+import './DebatePage.css';
 
 const DebateTopic = ({ debate, user, onVote }) => {
   const userVote = user && debate.voters ? debate.voters[user.uid] : null;
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: '16px', marginBottom: '20px' }}>
-      <div style={{ padding: '20px', borderBottom: '1px solid #eee', fontSize: '1.2em', textAlign: 'center' }}>
-        <strong>{debate.topic}</strong>
+    <div className="debate-topic-card">
+      <div className="debate-topic-header">
+        <h3>{debate.topic}</h3>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '20px 0' }}>
-        <div style={{ textAlign: 'center', marginRight: '50px' }}>
-          <button onClick={() => onVote(debate.id, 'O')} disabled={!!userVote || debate.status === 'closed'} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'O' ? 'lightblue' : '' }}>
+      <div className="debate-voting-section">
+        <div className="vote-option">
+          <button 
+            onClick={() => onVote(debate.id, 'O')} 
+            disabled={!!userVote || debate.status === 'closed'} 
+            className={`vote-button vote-button-o ${userVote === 'O' ? 'voted-o' : ''}`}
+          >
              O
           </button>
-          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.o_votes}</p>
+          <p className="vote-count">{debate.o_votes}</p>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <button onClick={() => onVote(debate.id, 'X')} disabled={!!userVote || debate.status === 'closed'} style={{ fontSize: '1.5em', padding: '10px 20px', backgroundColor: userVote === 'X' ? 'lightcoral' : '' }}>
+        <div className="vote-option">
+          <button 
+            onClick={() => onVote(debate.id, 'X')} 
+            disabled={!!userVote || debate.status === 'closed'} 
+            className={`vote-button vote-button-x ${userVote === 'X' ? 'voted-x' : ''}`}
+          >
              X
           </button>
-          <p style={{ fontSize: '2em', fontWeight: 'bold' }}>{debate.x_votes}</p>
+          <p className="vote-count">{debate.x_votes}</p>
         </div>
       </div>
-      {userVote && <p style={{ textAlign: 'center' }}>당신은 '{userVote}'에 투표했습니다.</p>}
+      {userVote && <p className="debate-status-message user-vote-message">당신은 '{userVote}'에 투표했습니다.</p>}
       {debate.status === 'closed' && (
-        <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: 'bold', color: 'blue' }}>
+        <div className="debate-status-message closed-debate-message">
           <p>마감된 예측입니다. (정답: {debate.correctAnswer})</p>
         </div>
       )}
@@ -72,19 +80,21 @@ function DebatePage() {
       const voteOnDebateFunc = httpsCallable(functions, 'voteOnDebate');
       const result = await voteOnDebateFunc({ debateId, vote: voteType });
       setVoteMessage(result.data.message);
-      fetchAllDebates(); // Re-fetch all debates to update UI
+      fetchAllDebates();
     } catch (err) {
       setVoteMessage(`투표 실패: ${err.message}`);
     }
   };
 
   if (loading) return <div>토론 주제를 불러오는 중...</div>;
-  if (error) return <div>오류: {error}</div>;
+  if (error) return <div className="error-message">오류: {error}</div>;
 
   return (
-    <div>
-      <h2>O/X 예측</h2>
-      {voteMessage && <p style={{ fontWeight: 'bold' }}>{voteMessage}</p>}
+    <div className="debate-container">
+      <div className="debate-header">
+        <h2>O/X 예측</h2>
+      </div>
+      {voteMessage && <p className="vote-message">{voteMessage}</p>}
 
       {debates.length > 0 ? (
         debates.map(debate => (

@@ -1,0 +1,71 @@
+.hall-of-fame-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.hall-of-fame-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.season-card {
+  background-color: var(--container-bg-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+  overflow: hidden;
+}
+
+.season-header {
+  padding: 15px 20px;
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.season-header h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ranking-table th, .ranking-table td {
+  padding: 15px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-table thead th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.ranking-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ranking-table tbody tr:nth-child(odd) {
+  background-color: #fdfdfd;
+}
+
+.ranking-table tbody tr:hover {
+  background-color: #f1f3f5;
+}
+
+.ranker-nickname {
+  font-weight: 500;
+}
+
+.profit-rate-positive {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.profit-rate-negative {
+  color: #c0392b;
+  font-weight: bold;
+}

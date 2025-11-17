@@ -1,19 +1,17 @@
-// client/src/pages/QuizPage.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import './QuizPage.css';
 
 function QuizPage() {
-  const [step, setStep] = useState(1); // 1: 자격검사, 2: 퀴즈풀기, 3: 결과확인
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-
   const [quizzes, setQuizzes] = useState([]);
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState({}); // { quizId: answerIndex }
+  const [userAnswers, setUserAnswers] = useState({});
 
-  // 1. 자격 검사
   useEffect(() => {
     const checkEligibility = async () => {
       setLoading(true);
@@ -35,7 +33,6 @@ function QuizPage() {
     checkEligibility();
   }, []);
 
-  // 2. 모든 퀴즈 가져오기
   const fetchAllQuizzes = useCallback(async () => {
     try {
       const q = query(collection(db, 'quizzes'), orderBy('createdAt', 'asc'));
@@ -52,12 +49,10 @@ function QuizPage() {
     }
   }, []);
 
-  // 3. 답변 선택 핸들러
   const handleSelectAnswer = (quizId, answerIndex) => {
     setUserAnswers(prev => ({ ...prev, [quizId]: answerIndex }));
   };
 
-  // 4. 다음 문제로 이동 또는 최종 제출
   const handleNextOrSubmit = async () => {
     const currentQuiz = quizzes[currentQuizIndex];
     if (userAnswers[currentQuiz.id] === undefined) {
@@ -65,17 +60,11 @@ function QuizPage() {
       return;
     }
     setMessage('');
-
     const isLastQuiz = currentQuizIndex === quizzes.length - 1;
-
     if (isLastQuiz) {
-      // 최종 제출 로직
       setLoading(true);
       try {
-        const answersToSubmit = Object.keys(userAnswers).map(quizId => ({
-          quizId,
-          answerIndex: userAnswers[quizId],
-        }));
+        const answersToSubmit = Object.keys(userAnswers).map(quizId => ({ quizId, answerIndex: userAnswers[quizId] }));
         const submitAllFunc = httpsCallable(functions, 'submitAllQuizAnswers');
         const result = await submitAllFunc({ answers: answersToSubmit });
         setMessage(result.data.message);
@@ -86,58 +75,54 @@ function QuizPage() {
         setLoading(false);
       }
     } else {
-      // 다음 문제로
       setCurrentQuizIndex(prev => prev + 1);
     }
   };
 
-  // --- UI 렌더링 ---
   const renderContent = () => {
-    if (loading) return <div>로딩 중...</div>;
-
+    if (loading) return <div className="loading-spinner"></div>;
     switch (step) {
       case 1:
-        return <p style={{ color: 'red', fontWeight: 'bold' }}>{message}</p>;
-      
+        return <div className="alert alert-error">{message}</div>;
       case 2:
-        if (quizzes.length === 0) return <p style={{ color: 'red' }}>{message}</p>;
+        if (quizzes.length === 0) return <div className="alert">{message}</div>;
         const currentQuiz = quizzes[currentQuizIndex];
         const isLastQuiz = currentQuizIndex === quizzes.length - 1;
         return (
-          <div>
-            <h3>Q {currentQuizIndex + 1}. {currentQuiz.question}</h3>
-            <p>({currentQuizIndex + 1}/{quizzes.length})</p>
-            {currentQuiz.options.map((option, index) => (
-              <div key={index}>
-                <input
-                  type="radio"
-                  id={`option-${index}`}
-                  name={`quiz-${currentQuiz.id}`}
-                  value={index}
-                  onChange={() => handleSelectAnswer(currentQuiz.id, index)}
-                  checked={userAnswers[currentQuiz.id] === index}
-                />
-                <label htmlFor={`option-${index}`}>{option}</label>
-              </div>
-            ))}
-            <button onClick={handleNextOrSubmit} style={{ marginTop: '20px' }}>
-              {isLastQuiz ? '최종 정답 제출' : '다음 문제'}
-            </button>
-            {message && <p style={{ color: 'red' }}>{message}</p>}
+          <div className="quiz-step-container">
+            <div className="quiz-progress-bar">
+              <div className="quiz-progress" style={{ width: `${((currentQuizIndex + 1) / quizzes.length) * 100}%` }}></div>
+            </div>
+            <p className="quiz-progress-text">{currentQuizIndex + 1} / {quizzes.length}</p>
+            <div className="quiz-question">
+              <h3>Q. {currentQuiz.question}</h3>
+            </div>
+            <div className="quiz-options">
+              {currentQuiz.options.map((option, index) => (
+                <label key={index} className={`quiz-option ${userAnswers[currentQuiz.id] === index ? 'quiz-option-selected' : ''}`}>
+                  <input type="radio" name={`quiz-${currentQuiz.id}`} value={index} onChange={() => handleSelectAnswer(currentQuiz.id, index)} checked={userAnswers[currentQuiz.id] === index} />
+                  {option}
+                </label>
+              ))}
+            </div>
+            <div className="quiz-navigation">
+              <button onClick={handleNextOrSubmit}>{isLastQuiz ? '최종 정답 제출' : '다음 문제'}</button>
+            </div>
+            {message && <p className="error-message">{message}</p>}
           </div>
         );
-
       case 3:
-        return <p style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{message}</p>;
-
+        return <div className="quiz-result-container"><h3>{message}</h3></div>;
       default:
         return null;
     }
   };
 
   return (
-    <div>
-      <h2>패자부활전 퀴즈</h2>
+    <div className="quiz-container">
+      <div className="quiz-header">
+        <h2>패자부활전 퀴즈</h2>
+      </div>
       {renderContent()}
     </div>
   );

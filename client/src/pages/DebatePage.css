@@ -1,0 +1,110 @@
+.debate-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.debate-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.debate-topic-card {
+  background-color: var(--container-bg-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  margin-bottom: 25px;
+  overflow: hidden;
+}
+
+.debate-topic-header {
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.debate-topic-header h3 {
+  margin: 0;
+  font-size: 22px;
+  text-align: center;
+}
+
+.debate-voting-section {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 30px 20px;
+}
+
+.vote-option {
+  text-align: center;
+}
+
+.vote-button {
+  font-size: 28px;
+  font-weight: bold;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 3px solid;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vote-button-o {
+  color: #2980b9;
+  border-color: #2980b9;
+  background-color: white;
+}
+
+.vote-button-o:hover:not(:disabled) {
+  background-color: #2980b9;
+  color: white;
+}
+
+.vote-button-x {
+  color: #c0392b;
+  border-color: #c0392b;
+  background-color: white;
+}
+
+.vote-button-x:hover:not(:disabled) {
+  background-color: #c0392b;
+  color: white;
+}
+
+.vote-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.voted-o {
+  background-color: #a9cce3;
+}
+
+.voted-x {
+  background-color: #f5b7b1;
+}
+
+.vote-count {
+  font-size: 32px;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+.debate-status-message {
+  text-align: center;
+  padding: 15px;
+  font-weight: 500;
+}
+
+.user-vote-message {
+  background-color: #e8f6f3;
+  border-top: 1px solid var(--border-color);
+}
+
+.closed-debate-message {
+  background-color: #f4f6f7;
+  color: #566573;
+  border-top: 1px solid var(--border-color);
+}

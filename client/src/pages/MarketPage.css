@@ -1,0 +1,110 @@
+.market-container {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+
+.market-main {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.market-sidebar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chart-container {
+  height: 500px;
+  background-color: #f4f4f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.order-history-container {
+  display: flex;
+  gap: 20px;
+  background-color: var(--container-bg-color);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.order-form-container, .transaction-history-container {
+  flex: 1;
+}
+
+.search-container {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.search-container input {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px 0 0 4px;
+}
+
+.search-container button {
+  padding: 10px 15px;
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+.stock-info-container {
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--container-bg-color);
+}
+
+.stock-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stock-info-header h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.stock-info-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stock-info-price .price-krw {
+  font-size: 36px;
+  font-weight: bold;
+}
+
+.stock-info-price .price-usd {
+  font-size: 20px;
+  color: #666;
+}
+
+.stock-info-price .price-change {
+  font-size: 20px;
+}
+
+.price-up { color: #e74c3c; }
+.price-down { color: #3498db; }
+.price-even { color: #333; }
+
+.favorites-container, .news-container {
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--container-bg-color);
+}

@@ -1,57 +1,44 @@
-// client/src/pages/MarketPage.js
 import React, { useState, useEffect } from 'react';
-import { Grid, Box, Typography, IconButton } from '@mui/material';
-import { Star, StarBorder } from '@mui/icons-material';
 import { functions, auth } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Star, StarBorder } from '@mui/icons-material'; // 아이콘은 유지
 
-// 컴포넌트 임포트
 import MarketOrderForm from '../components/MarketOrderForm';
 import TradingViewWidget from '../components/TradingViewWidget';
 import TransactionHistory from '../components/TransactionHistory';
 import FavoritesList from '../components/FavoritesList';
 import NewsList from '../components/NewsList';
+import './MarketPage.css';
 
-// Cloud Functions
 const getStockQuote = httpsCallable(functions, 'getStockQuote');
 const addFavorite = httpsCallable(functions, 'addFavorite');
 const removeFavorite = httpsCallable(functions, 'removeFavorite');
 const getFavoritesList = httpsCallable(functions, 'getFavoritesList');
 
-// 헬퍼 함수: 숫자 포맷
 const formatNumber = (num, type = 'krw') => {
   if (num === undefined || num === null) return '-';
-  if (type === 'krw') {
-    return `${Math.round(num).toLocaleString('ko-KR')} KRW`;
-  }
-  if (type === 'usd') {
-    return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
+  if (type === 'krw') return `${Math.round(num).toLocaleString('ko-KR')} KRW`;
+  if (type === 'usd') return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return `${num.toFixed(2)}%`;
 };
 
-// 헬퍼 함수: 숫자 색상 (상승/하락)
-const getColor = (num) => {
-  if (num > 0) return 'green';
-  if (num < 0) return 'red';
-  return 'black';
+const getColorClass = (num) => {
+  if (num > 0) return 'price-up';
+  if (num < 0) return 'price-down';
+  return 'price-even';
 };
 
 function MarketPage() {
   const [searchInput, setSearchInput] = useState('AAPL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   const [activeSymbol, setActiveSymbol] = useState('');
   const [stockInfo, setStockInfo] = useState(null);
-
-  // 즐겨찾기 State
   const [favorites, setFavorites] = useState(new Set());
   const [refreshFavsTrigger, setRefreshFavsTrigger] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // 로그인 시 즐겨찾기 목록 로딩
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -70,12 +57,10 @@ function MarketPage() {
     return () => unsubscribe();
   }, []);
 
-  // 현재 종목이 즐겨찾기인지 체크
   useEffect(() => {
     setIsFavorite(favorites.has(activeSymbol));
   }, [activeSymbol, favorites]);
 
-  // 종목 검색 처리
   const handleSearch = async (symbolToSearch) => {
     if (!symbolToSearch || symbolToSearch.trim() === '') {
       setError("종목 코드를 입력해주세요.");
@@ -84,9 +69,7 @@ function MarketPage() {
     setLoading(true);
     setError(null);
     setStockInfo(null);
-
     const upperSymbol = symbolToSearch.toUpperCase();
-
     try {
       const result = await getStockQuote({ symbol: upperSymbol });
       if (result.data.success) {
@@ -105,10 +88,8 @@ function MarketPage() {
     }
   };
 
-  // 즐겨찾기 토글
   const toggleFavorite = async () => {
     if (!activeSymbol || !stockInfo || !auth.currentUser) return;
-
     const currentName = stockInfo.name;
     try {
       if (isFavorite) {
@@ -129,150 +110,86 @@ function MarketPage() {
     }
   };
 
-  // 즐겨찾기 클릭
   const handleFavoriteClick = (symbol) => {
     handleSearch(symbol);
   };
 
   return (
-    <Box>
-
-      {/* 전체 레이아웃 */}
-      <Grid container spacing={2}>
-
-        {/* 1. 좌측: 차트 + 주문/거래내역 */}
-        <Grid
-          item
-          xs={12}
-          md={9}
-          lg={9}
-          sx={{
-            minWidth: 0,
-            width: '65%',
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
-          {/* 차트 */}
+    <div className="market-container">
+      <main className="market-main">
+        <div className="chart-container">
           {activeSymbol ? (
             <TradingViewWidget symbol={activeSymbol} />
           ) : (
-            <Box sx={{
-              height: 500,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#f4f4f4'
-            }}>
-              <Typography color="textSecondary">
-                종목 코드를 검색하면 차트가 표시됩니다. (예: AAPL, GOOGL)
-              </Typography>
-            </Box>
+            <p>종목 코드를 검색하면 차트가 표시됩니다. (예: AAPL, GOOGL)</p>
           )}
-
-          {/* 주문 + 거래내역 나란히 배치 */}
-          <Box
-            sx={{
-              border: '1px solid #ddd',
-              borderRadius: 1,
-              mt: 2,
-              p: 2
-            }}
-          >
-            <Grid container spacing={2}>
-              {/* 주문폼 */}
-              <Grid item xs={12} md={6}>
-                <MarketOrderForm symbol={activeSymbol} stockInfo={stockInfo} />
-              </Grid>
-
-              {/* 거래내역 */}
-              <Grid item xs={12} md={6}>
-                <TransactionHistory symbol={activeSymbol} />
-              </Grid>
-            </Grid>
-          </Box>
-        </Grid>
-
-        {/* 2. 우측: 검색창 + 종목 정보 + 즐겨찾기 + 뉴스 */}
-        <Grid item xs={12} md={3} lg={3} sx={{ minWidth: 0 }}>
-
-          {/* 검색창 */}
-          <div style={{ display: 'flex', marginBottom: '10px' }}>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && !loading && handleSearch(searchInput)}
-              placeholder="종목 코드 검색 (예: AAPL)"
-              style={{ flexGrow: 1, padding: '10px', border: '1px solid #ccc' }}
-            />
-            <button
-              onClick={() => handleSearch(searchInput)}
-              disabled={loading}
-              style={{ padding: '10px 15px', border: '1px solid #ccc', borderLeft: 'none' }}
-            >
-              {loading ? '...' : '검색'}
-            </button>
+        </div>
+        <div className="order-history-container">
+          <div className="order-form-container">
+            <MarketOrderForm symbol={activeSymbol} stockInfo={stockInfo} />
           </div>
-          {error && <div style={{ color: 'red', marginBottom: '10px' }}>오류: {error}</div>}
+          <div className="transaction-history-container">
+            <TransactionHistory symbol={activeSymbol} />
+          </div>
+        </div>
+      </main>
 
-          {/* 종목 정보 */}
-          <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
-            {stockInfo ? (
-              <>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
-                    {stockInfo.name} ({activeSymbol})
-                  </Typography>
-                  <IconButton onClick={toggleFavorite} size="small" disabled={!auth.currentUser}>
-                    {isFavorite ? <Star sx={{ color: '#fbc02d' }} /> : <StarBorder />}
-                  </IconButton>
-                </Box>
-
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: 1,
-                  mt: 1,
-                  flexWrap: 'wrap'
-                }}>
-                  <Typography variant="h4" sx={{ color: getColor(stockInfo.change) }}>
-                    {formatNumber(stockInfo.price_krw, 'krw')}
-                  </Typography>
-
-                  {!stockInfo.is_krw_stock && (
-                    <Typography variant="h6" color="textSecondary">
-                      ({formatNumber(stockInfo.price_usd, 'usd')})
-                    </Typography>
-                  )}
-
-                  <Typography variant="h6" sx={{ color: getColor(stockInfo.change) }}>
-                    {formatNumber(stockInfo.changePercent, 'percent')}
-                  </Typography>
-                </Box>
-              </>
-            ) : (
-              <Box sx={{ color: '#888' }}>
-                <Typography variant="h5">종목을 검색하세요</Typography>
-                <Typography variant="h4">-</Typography>
-              </Box>
-            )}
-          </Box>
-
-          {/* 즐겨찾기 */}
-          <FavoritesList
-            onFavoriteClick={handleFavoriteClick}
-            refreshTrigger={refreshFavsTrigger}
+      <aside className="market-sidebar">
+        <div className="search-container">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && !loading && handleSearch(searchInput)}
+            placeholder="종목 코드 검색 (예: AAPL)"
           />
+          <button onClick={() => handleSearch(searchInput)} disabled={loading}>
+            {loading ? '...' : '검색'}
+          </button>
+        </div>
+        {error && <div className="error-message">{error}</div>}
 
-          {/* 뉴스 */}
+        <div className="stock-info-container">
+          {stockInfo ? (
+            <>
+              <div className="stock-info-header">
+                <h3>{stockInfo.name} ({activeSymbol})</h3>
+                <button onClick={toggleFavorite} disabled={!auth.currentUser} className="icon-button">
+                  {isFavorite ? <Star style={{ color: '#fbc02d' }} /> : <StarBorder />}
+                </button>
+              </div>
+              <div className="stock-info-price">
+                <span className={`price-krw ${getColorClass(stockInfo.change)}`}>
+                  {formatNumber(stockInfo.price_krw, 'krw')}
+                </span>
+                {!stockInfo.is_krw_stock && (
+                  <span className="price-usd">
+                    ({formatNumber(stockInfo.price_usd, 'usd')})
+                  </span>
+                )}
+                <span className={`price-change ${getColorClass(stockInfo.change)}`}>
+                  {formatNumber(stockInfo.changePercent, 'percent')}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div>
+              <h3>종목을 검색하세요</h3>
+              <p>-</p>
+            </div>
+          )}
+        </div>
+
+        <div className="favorites-container">
+          <FavoritesList onFavoriteClick={handleFavoriteClick} refreshTrigger={refreshFavsTrigger} />
+        </div>
+        <div className="news-container">
           <NewsList symbol={activeSymbol} />
-
-        </Grid>
-
-      </Grid>
-    </Box>
+        </div>
+      </aside>
+    </div>
   );
 }
 
 export default MarketPage;
+

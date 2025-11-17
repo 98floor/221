@@ -1,0 +1,70 @@
+.admin-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.admin-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.admin-section {
+  background-color: var(--container-bg-color);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.admin-section-header {
+  padding: 15px 20px;
+  cursor: pointer;
+  background-color: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-section-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-section-content {
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th, .admin-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.admin-form input, .admin-form select, .admin-form textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.danger-zone {
+  border-color: #c0392b;
+}
+
+.danger-zone .admin-section-header {
+  background-color: #f5b7b1;
+}
