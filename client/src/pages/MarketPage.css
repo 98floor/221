@@ -28,6 +28,18 @@
   border: 1px solid var(--border-color);
 }
 
+.chart-placeholder {
+  text-align: center;
+  color: #aaa;
+}
+
+.placeholder-logo {
+  font-size: 48px;
+  font-weight: bold;
+  color: var(--primary-color);
+  opacity: 0.5;
+}
+
 .order-history-container {
   display: flex;
   gap: 20px;
@@ -77,24 +89,31 @@
   font-size: 24px;
 }
 
-.stock-info-price {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+.stock-info-price-container {
   margin-top: 10px;
 }
 
-.stock-info-price .price-krw {
+.price-main-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.price-sub-line {
+  margin-top: 5px;
+}
+
+.price-krw {
   font-size: 36px;
   font-weight: bold;
 }
 
-.stock-info-price .price-usd {
+.price-usd {
   font-size: 20px;
   color: #666;
 }
 
-.stock-info-price .price-change {
+.price-change {
   font-size: 20px;
 }
 

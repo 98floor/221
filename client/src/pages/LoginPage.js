@@ -79,8 +79,10 @@ function LoginPage() {
           />
         </div>
         <button type="submit" className="form-button">로그인</button>
-        <Link to="/password-reset" className="form-link">비밀번호 찾기</Link>
-        <Link to="/register" className="form-link">회원가입</Link>
+        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '20px' }}>
+          <Link to="/register" className="form-link" style={{ marginTop: 0 }}>회원가입</Link>
+          <Link to="/password-reset" className="form-link" style={{ marginTop: 0 }}>비밀번호 찾기</Link>
+        </div>
       </form>
     </div>
   );

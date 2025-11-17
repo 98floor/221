@@ -121,7 +121,10 @@ function MarketPage() {
           {activeSymbol ? (
             <TradingViewWidget symbol={activeSymbol} />
           ) : (
-            <p>종목 코드를 검색하면 차트가 표시됩니다. (예: AAPL, GOOGL)</p>
+            <div className="chart-placeholder">
+              <div className="placeholder-logo">UNIVEST</div>
+              <p>종목 코드를 검색하면 차트가 표시됩니다.</p>
+            </div>
           )}
         </div>
         <div className="order-history-container">
@@ -158,18 +161,22 @@ function MarketPage() {
                   {isFavorite ? <Star style={{ color: '#fbc02d' }} /> : <StarBorder />}
                 </button>
               </div>
-              <div className="stock-info-price">
-                <span className={`price-krw ${getColorClass(stockInfo.change)}`}>
-                  {formatNumber(stockInfo.price_krw, 'krw')}
-                </span>
-                {!stockInfo.is_krw_stock && (
-                  <span className="price-usd">
-                    ({formatNumber(stockInfo.price_usd, 'usd')})
+              <div className="stock-info-price-container">
+                <div className="price-main-line">
+                  <span className={`price-krw ${getColorClass(stockInfo.change)}`}>
+                    {formatNumber(stockInfo.price_krw, 'krw')}
                   </span>
+                  <span className={`price-change ${getColorClass(stockInfo.change)}`}>
+                    {formatNumber(stockInfo.changePercent, 'percent')}
+                  </span>
+                </div>
+                {!stockInfo.is_krw_stock && (
+                  <div className="price-sub-line">
+                    <span className="price-usd">
+                      ({formatNumber(stockInfo.price_usd, 'usd')})
+                    </span>
+                  </div>
                 )}
-                <span className={`price-change ${getColorClass(stockInfo.change)}`}>
-                  {formatNumber(stockInfo.changePercent, 'percent')}
-                </span>
               </div>
             </>
           ) : (
