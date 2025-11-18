@@ -28,6 +28,7 @@ import NoticePage from './pages/NoticePage';
 import PasswordResetPage from './pages/PasswordResetPage';
 import QuestPage from './pages/QuestPage'; // [신규] 퀘스트 페이지 임포트
 import PostWritePage from './pages/PostWritePage';
+import DomesticMarketPage from './pages/DomesticMarketPage'; // [신규] 국내 주식 페이지 임포트
 
 // [신규] App 컴포넌트의 내용을 분리 (useLocation 훅을 사용하기 위함)
 function AppContent() {
@@ -35,6 +36,7 @@ function AppContent() {
   const navLinks = [
     { name: '공지사항', path: '/notice' }, 
     { name: '해외 주식', path: '/market' },
+    { name: '국내 주식', path: '/domestic-market' }, // [신규] 국내 주식 링크 추가
     { name: '자산', path: '/portfolio' },
     { name: '랭킹', path: '/ranking' },
     { name: '명예의 전당', path: '/hall-of-fame' },
@@ -192,6 +194,7 @@ function AppContent() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/notice" element={<NoticePage />} />
           <Route path="/market" element={<MarketPage />} />
+          <Route path="/domestic-market" element={<DomesticMarketPage />} /> {/* [신규] 국내 주식 라우트 추가 */}
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/ranking" element={<RankingPage />} />
           <Route path="/hall-of-fame" element={<HallOfFamePage />} />
